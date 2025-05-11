@@ -1,7 +1,7 @@
 # webhooks/urls.py
 from django.urls import path
-from .views import github_push_hook
+from .views import github_webhook
 
 urlpatterns = [
-    path("github/", github_push_hook, name="github_push"),
+    path("github/", github_webhook, name="github_push"),
 ]

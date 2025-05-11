@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=brandon
+      - POSTGRES_PASSWORD=CoTeXTempPass
+    ports:
+      - "5435:5432"
+
+  web:
+    build: .
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_NAME=postgres
+      - DATABASE_USER=brandon
+      - DATABASE_PASSWORD=CoTeXTempPass
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
+      - SECRET_KEY=django-insecure-ai#^*ewd8)ig$mei(7p^!8hw^s#(-9synck0u$e0f5tu((wl@^
+      - GITHUB_WEBHOOK_SECRET=github_webhook_secret
+
+volumes:
+  postgres_data:

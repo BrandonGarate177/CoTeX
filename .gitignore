@@ -1,0 +1,7 @@
+.venv
+/backend/.venv
+/backend/dockerDeploment.text
+/backend/.dockerignore
+/backend/Dockerfile
+/backend/docker-compose.yml
+/backend/DockerDepolyent.txt
