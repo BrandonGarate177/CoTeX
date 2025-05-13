@@ -49,13 +49,14 @@ INSTALLED_APPS = [
     'drf_yasg',
 
     'corsheaders',
-
+    'accounts',
     
     'webhooks',
     'projects', 
     'files',
     'notes',
 ]
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -189,3 +190,8 @@ SWAGGER_SETTINGS = {
 # Add login URLs for Swagger
 LOGIN_URL = 'admin:login'
 LOGOUT_URL = 'admin:logout'
+
+
+#media 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

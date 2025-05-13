@@ -22,6 +22,7 @@ from drf_yasg import openapi
 from rest_framework.routers import DefaultRouter
 from projects.views import ProjectViewSet
 from django.conf import settings
+from django.conf.urls.static import static
 
 
 swagger_permission_classes = [permissions.AllowAny] if settings.DEBUG else [permissions.IsAuthenticated]
@@ -53,3 +54,6 @@ urlpatterns = [
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
