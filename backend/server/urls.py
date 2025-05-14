@@ -20,7 +20,7 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework.routers import DefaultRouter
-from projects.views import ProjectViewSet
+from apps.projects.views import ProjectViewSet
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -40,14 +40,15 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path("api/webhooks/", include("webhooks.urls")),
+    path("api/webhooks/", include("apps.webhooks.urls")),
 
 
     # projects API URLs
-    path("api/projects/", include("projects.urls")),
+    path("api/projects/", include("apps.projects.urls")),
 
     # notes API URLs
-    path("api/notes/", include("notes.urls")),
+    path("api/notes/", include("apps.notes.urls")),
+    path("api/auth/", include("apps.authentication.urls")),
     
     # Swagger documentation URLs
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),

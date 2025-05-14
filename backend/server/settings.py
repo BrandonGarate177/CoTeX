@@ -14,6 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import os
+from datetime import timedelta
 
 load_dotenv() 
 
@@ -49,12 +50,14 @@ INSTALLED_APPS = [
     'drf_yasg',
 
     'corsheaders',
-    'accounts',
-    
-    'webhooks',
-    'projects', 
-    'files',
-    'notes',
+
+
+    'apps.accounts',
+    'apps.authentication',
+    'apps.webhooks',
+    'apps.projects', 
+    'apps.files',
+    'apps.notes',
 ]
 
 
@@ -170,12 +173,19 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+}
 # Swagger settings
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
