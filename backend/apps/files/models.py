@@ -33,7 +33,7 @@ class Folder(models.Model):
 
 class File(models.Model):
     name = models.CharField(max_length=255)
-    # content = models.TextField(blank=True)
+    content = models.TextField(blank=True)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='files')
     folder = models.ForeignKey(Folder, on_delete=models.CASCADE, related_name='files', null=True, blank=True)
     is_main = models.BooleanField(default=False)  # Indicates if this is the main .tex file

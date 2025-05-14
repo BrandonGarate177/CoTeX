@@ -51,6 +51,8 @@ def require_email_verification():
     
     return decorator
 
+
+## SIGNUPS
 class RegisterView(APIView):
     """View for registering new users"""
     permission_classes = [permissions.AllowAny]
@@ -190,6 +192,8 @@ class ResendVerificationEmailView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+### LOGIN
 class LoginView(APIView):
     """View for logging in users"""
     permission_classes = [permissions.AllowAny]
