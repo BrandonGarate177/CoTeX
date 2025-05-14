@@ -70,6 +70,13 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',  # Make sure this is present
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+]
+
+CORS_ALLOW_ALL_ORIGINS = True  # For development only - restrict this in production
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Your React app URL
 ]
 
 ROOT_URLCONF = 'server.urls'
@@ -113,10 +120,6 @@ DATABASES = {
 
 
 
-
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:8000',
-]
 
 # CSRF_TRUSTED_ORIGINS = [
 #     'https://c905-2600-8801-ac0a-e500-6c37-bda6-e96a-8fb.ngrok-free.app',

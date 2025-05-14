@@ -16,31 +16,50 @@ class Note(models.Model):
     Notes associated with files for studying and understanding code.
     Supports LaTeX formatting and code snippets.
     """
+    title = models.CharField(max_length=255, blank=True)
     file = models.ForeignKey(File, on_delete=models.CASCADE, related_name='notes', null=True, blank=True)
+    folder = models.ForeignKey(Folder, on_delete=models.CASCADE, related_name='notes', null=True, blank=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='notes', null=True, blank=True)
     path = models.CharField(max_length=255, null=True, blank=True)  # Store the file path in the git repo
+    slug = models.SlugField(max_length=255, blank=True, unique=True)
     content = models.TextField(blank=True)
     rendered_html = models.TextField(blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
+    updated_at = models.DateTimeField(auto_now=True)  # Add this field
+
     class Meta:
         ordering = ['-updated_at']
     
     def __str__(self):
         if self.file:
             return f"Note for {self.file.name}"
+        elif self.folder:
+            return f"Note for folder {self.folder.name}"
+        elif self.project:
+            return f"Note for project {self.project.name}"
         elif self.path:
             import os
             return f"Note for {os.path.basename(self.path)}"
         return f"Note {self.id}"
-    
+
     def save(self, *args, **kwargs):
+        # Generate slug if not provided
+        if not self.slug:
+            # Base the slug on the associated entity or a timestamp
+            if self.file:
+                base = f"note-{self.file.name}"
+            elif self.folder:
+                base = f"note-{self.folder.name}"
+            elif self.project:
+                base = f"note-{self.project.name}"
+            else:
+                import time
+                base = f"note-{int(time.time())}"
+            self.slug = slugify(base)
+    
         if self.content:
             # Render the content to HTML
             self.render_content()
-        
-        super().save(*args, **kwargs)
-
 
     def render_content(self):
         """
