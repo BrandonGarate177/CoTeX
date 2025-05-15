@@ -21,7 +21,7 @@ export default function LeftSide() {
   
   const typingSpeed = 120; // milliseconds per character
   const deletingSpeed = 20; // faster deletion speed
-  const pauseTime = 2000; // pause time at full text and empty text
+  const pauseTime = 500; // pause time at full text and empty text
   
   useEffect(() => {
     let timeout;
