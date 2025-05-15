@@ -22,8 +22,11 @@ class Project(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     # GitHub Metadata
+    # IS this a github repo? 
+    is_github_repo = models.BooleanField(default=False)
     github_repo = models.CharField(max_length=255, blank=True, null=True)  # e.g. 'username/repo-name'
     github_branch = models.CharField(max_length=255, default='main')
+
 
     def __str__(self):
         return self.name

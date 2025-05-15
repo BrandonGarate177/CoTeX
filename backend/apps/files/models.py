@@ -8,9 +8,8 @@ class Folder(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    content = models.TextField(blank=True, null=True)  # For text-based files
-    file_upload = models.FileField(upload_to='uploads/%Y/%m/%d/', null=True, blank=True)  # For binary or large files
-    
+    # ammount of fules in the folder
+    file_count = models.IntegerField(default=0)  # Number of files uploaded in this folder    
     class Meta:
         # Ensure no duplicate folder names within the same parent folder or project root
         unique_together = [['name', 'parent', 'project']]

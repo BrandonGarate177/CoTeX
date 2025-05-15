@@ -45,6 +45,7 @@ urlpatterns = [
     path('', RedirectView.as_view(url='/swagger/', permanent=False), name='swagger-redirect'),
     path('admin/', admin.site.urls),
     path("api/webhooks/", include("apps.webhooks.urls")),
+    path("api/files/", include("apps.files.urls")),
 
     path("api/accounts/", include("apps.accounts.urls")),
     # projects API URLs

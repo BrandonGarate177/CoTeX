@@ -25,3 +25,7 @@ class GitFileSerializer(serializers.ModelSerializer):
         ).count()
 
 
+class FolderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Folder
+        fields = ['name', 'parent', 'project', 'created_at', 'updated_at', 'file_count']
