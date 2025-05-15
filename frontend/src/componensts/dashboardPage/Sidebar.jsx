@@ -225,8 +225,21 @@ export default function Sidebar() {
                 className="flex w-full items-center px-3 py-2 rounded hover:bg-[#27004A] cursor-move"
                 onClick={() => toggleExpand(idx)}
               >
-                {/* Left aligned title */}
-                <span className="flex-1 text-lg text-left">{sec.title}</span>
+                {/* Left aligned title with + button for Projects section */}
+                <span className="flex-1 text-lg text-left">
+                  {sec.title}
+                  {sec.id === 'projects' && (
+                    <button 
+                      className="ml-2 px-2 text-sm bg-[#27004A] rounded-full hover:bg-purple-800 inline-flex items-center justify-center"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent toggling the section
+                        console.log("Create new project clicked");
+                      }}
+                    >
+                      +
+                    </button>
+                  )}
+                </span>
                 <span
                   className={`text-2xl transform transition-transform duration-200 ${
                     sec.expanded ? 'rotate-90' : ''
@@ -243,15 +256,7 @@ export default function Sidebar() {
                       {loading && <div className="text-sm text-gray-300 p-2">Loading projects...</div>}
                       {error && <div className="text-sm text-red-400 p-2">{error}</div>}
                       
-                      {/* Create New Project Button */}
-                      <button 
-                        className="w-full mb-2 py-1 px-3 bg-purple-700 text-white rounded-md text-sm flex items-center justify-center"
-                        onClick={() => console.log("Create new project clicked")}
-                      >
-                        <span>+ New Project</span>
-                      </button>
-                      
-                      {/* Projects List */}
+                      {/* Projects List - Moved above the New Project button */}
                       {sec.items.length === 0 && !loading && !error && (
                         <div className="text-sm text-gray-300 p-2">No projects found. Create one to get started!</div>
                       )}
@@ -263,7 +268,18 @@ export default function Sidebar() {
                             className="flex w-full items-center px-3 py-1 rounded hover:bg-[#27004A]"
                             onClick={() => toggleProjectExpand(project.id)}
                           >
-                            <span className="flex-1 text-left">{project.title}</span>
+                            <span className="flex-1 text-left">{project.title}
+                              {/* Add New File button next to project title */}
+                              <button 
+                                className="ml-2 px-1.5 text-xs bg-[#27004A] rounded-full hover:bg-purple-800 inline-flex items-center justify-center"
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Prevent toggling the project expansion
+                                  console.log(`Add file to project ${project.projectId}`);
+                                }}
+                              >
+                                +
+                              </button>
+                            </span>
                             <span
                               className={`text-xl transform transition-transform duration-200 ${
                                 project.expanded ? 'rotate-90' : ''
@@ -276,14 +292,7 @@ export default function Sidebar() {
                           {/* Files for this Project */}
                           {project.expanded && (
                             <div className="ml-4 mt-1">
-                              {/* Add New File Button */}
-                              <button 
-                                className="w-full mb-2 py-1 px-2 bg-[#27004A] text-xs text-white rounded flex items-center justify-center"
-                                onClick={() => console.log(`Add file to project ${project.projectId}`)}
-                              >
-                                <span>+ New File</span>
-                              </button>
-                              
+                              {/* Files List */}
                               {project.items.length === 0 ? (
                                 <div className="text-sm text-gray-300 px-3 py-1">No files in this project</div>
                               ) : (
@@ -300,6 +309,8 @@ export default function Sidebar() {
                                   </div>
                                 ))
                               )}
+                              
+                              {/* Remove the separate New File button that was here before */}
                             </div>
                           )}
                         </div>
