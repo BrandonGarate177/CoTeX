@@ -1,11 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
 
+// We'll enhance the initial sections structure to support nested items
 const initialSections = [
   {
     id: 'projects',
     title: 'Projects',
-    content: 'Your projects will appear here',
+    content: null, // We'll replace this with dynamic content
     expanded: false,
+    items: [] // Will hold project items
   },
   {
     id: 'updates',
@@ -18,8 +21,101 @@ const initialSections = [
 export default function Sidebar() {
   const [sections, setSections] = useState(initialSections);
   const [dragging, setDragging] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const dragItemIndex = useRef(null);
   const sectionRefs = useRef([]);
+
+  // Fetch user's projects when the component mounts or Projects section is expanded
+  useEffect(() => {
+    const projectSection = sections.find(section => section.id === 'projects');
+    
+    if (projectSection && projectSection.expanded && projectSection.items.length === 0) {
+      fetchProjects();
+    }
+  }, [sections]);
+
+  const fetchProjects = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Get the API URL, falling back to default if not set
+      const apiUrl = process.env.REACT_APP_API_URL || '';
+      const token = localStorage.getItem('access_token');
+      
+      if (!token) {
+        throw new Error('Not authenticated. Please log in again.');
+      }
+      
+      // Get projects from the API
+      const response = await axios.get(`${apiUrl}/api/projects/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      // Log the full response structure for debugging
+      console.log('API response:', response);
+      console.log('Response data type:', typeof response.data);
+      console.log('Response data:', response.data);
+      
+      // Handle different response formats
+      let projectsArray = [];
+      if (Array.isArray(response.data)) {
+        // If response.data is already an array
+        projectsArray = response.data;
+      } else if (response.data && typeof response.data === 'object') {
+        // If response.data is an object with results property (common DRF pattern)
+        if (Array.isArray(response.data.results)) {
+          projectsArray = response.data.results;
+        } else {
+          // Try to convert the object to an array if possible
+          projectsArray = Object.values(response.data);
+        }
+      }
+      
+      // Make sure projectsArray is actually an array before proceeding
+      if (!Array.isArray(projectsArray)) {
+        console.error('Could not extract projects array from response:', response.data);
+        throw new Error('Unexpected API response format');
+      }
+      
+      // Update the projects section with the fetched data
+      setSections(prevSections => {
+        return prevSections.map(section => {
+          if (section.id === 'projects') {
+            // Map the API response to our UI structure
+            const projectItems = projectsArray.map(project => ({
+              id: `project-${project.id}`,
+              type: 'project',
+              projectId: project.id,
+              title: project.name,
+              expanded: false,
+              items: (project.files || []).map(file => ({
+                id: `file-${file.id}`,
+                type: 'file',
+                fileId: file.id,
+                title: file.name || file.filename || 'Unnamed file',
+                isMain: !!file.is_main
+              }))
+            }));
+            
+            return {
+              ...section,
+              items: projectItems
+            };
+          }
+          return section;
+        });
+      });
+    } catch (err) {
+      console.error('Failed to fetch projects:', err);
+      setError(err.message || 'Failed to load projects. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDragStart = (e, idx) => {
     dragItemIndex.current = idx;
@@ -75,12 +171,39 @@ export default function Sidebar() {
     );
   };
 
+  const toggleProjectExpand = (projectId) => {
+    setSections((prevSections) => {
+      return prevSections.map(section => {
+        if (section.id === 'projects') {
+          return {
+            ...section,
+            items: section.items.map(project => {
+              if (project.id === projectId) {
+                return {
+                  ...project,
+                  expanded: !project.expanded
+                };
+              }
+              return project;
+            })
+          };
+        }
+        return section;
+      });
+    });
+  };
+
+  const handleFileClick = (fileId) => {
+    // You can implement file selection/opening logic here
+    console.log(`Opening file with ID: ${fileId}`);
+  };
+
   return (
     <div className="flex flex-col h-screen w-[290px] bg-[#230B38] text-[#F7EBFD] font-['Source_Code_Pro']">
       {/* Header with Logo/Title */}
       <div className="px-4 py-4 text-2xl font-semibold">CoTeX</div>
 
-      {/* Sections - Now with left alignment */}
+      {/* Sections */}
       <div
         className="flex-1 overflow-auto p-2"
         onDragOver={handleDragOver}
@@ -114,8 +237,79 @@ export default function Sidebar() {
               </button>
 
               {sec.expanded && (
-                <div className="mt-1 bg-[#27004A] rounded px-3 py-2">
-                  <p className="text-sm text-gray-300">{sec.content}</p>
+                <div className="ml-2 mt-1">
+                  {sec.id === 'projects' ? (
+                    <>
+                      {loading && <div className="text-sm text-gray-300 p-2">Loading projects...</div>}
+                      {error && <div className="text-sm text-red-400 p-2">{error}</div>}
+                      
+                      {/* Create New Project Button */}
+                      <button 
+                        className="w-full mb-2 py-1 px-3 bg-purple-700 text-white rounded-md text-sm flex items-center justify-center"
+                        onClick={() => console.log("Create new project clicked")}
+                      >
+                        <span>+ New Project</span>
+                      </button>
+                      
+                      {/* Projects List */}
+                      {sec.items.length === 0 && !loading && !error && (
+                        <div className="text-sm text-gray-300 p-2">No projects found. Create one to get started!</div>
+                      )}
+                      
+                      {sec.items.map(project => (
+                        <div key={project.id} className="mb-2">
+                          {/* Project Entry */}
+                          <button
+                            className="flex w-full items-center px-3 py-1 rounded hover:bg-[#27004A]"
+                            onClick={() => toggleProjectExpand(project.id)}
+                          >
+                            <span className="flex-1 text-left">{project.title}</span>
+                            <span
+                              className={`text-xl transform transition-transform duration-200 ${
+                                project.expanded ? 'rotate-90' : ''
+                              }`}
+                            >
+                              {'>'}
+                            </span>
+                          </button>
+                          
+                          {/* Files for this Project */}
+                          {project.expanded && (
+                            <div className="ml-4 mt-1">
+                              {/* Add New File Button */}
+                              <button 
+                                className="w-full mb-2 py-1 px-2 bg-[#27004A] text-xs text-white rounded flex items-center justify-center"
+                                onClick={() => console.log(`Add file to project ${project.projectId}`)}
+                              >
+                                <span>+ New File</span>
+                              </button>
+                              
+                              {project.items.length === 0 ? (
+                                <div className="text-sm text-gray-300 px-3 py-1">No files in this project</div>
+                              ) : (
+                                project.items.map(file => (
+                                  <div 
+                                    key={file.id} 
+                                    className="px-3 py-1 text-sm rounded hover:bg-[#27004A] cursor-pointer flex items-center"
+                                    onClick={() => handleFileClick(file.fileId)}
+                                  >
+                                    <span className="flex-1">{file.title}</span>
+                                    {file.isMain && (
+                                      <span className="text-xs bg-purple-800 px-1 rounded">main</span>
+                                    )}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <div className="bg-[#27004A] rounded px-3 py-2">
+                      <p className="text-sm text-gray-300">{sec.content}</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
