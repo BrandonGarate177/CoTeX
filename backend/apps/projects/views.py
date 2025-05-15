@@ -55,3 +55,12 @@ class ProjectViewSet(viewsets.ModelViewSet):
         else:
             # Return the error
             return Response({"error": result}, status=status.HTTP_400_BAD_REQUEST)
+        
+    # change whether or not a project is a github repo
+    # A github repo'd project can NOT be changed to a non-github repo'd project
+    @action(detail=True, methods=['post'])
+    def github(self, request, pk=None):
+        project = self.get_object()
+        project.is_github_repo = not project.is_github_repo
+        project.save()
+        return Response({"is_github_repo": project.is_github_repo})
