@@ -103,7 +103,7 @@ export default function Editor() {
       
       {/* Resize handle */}
       <div
-        className="w-2 cursor-col-resize bg-purple-500 hover:bg-purple-300 transition-colors"
+        className="w-0.5 cursor-col-resize bg-purple-500 hover:bg-purple-300 transition-colors"
         onMouseDown={startResizing}
       />
       
