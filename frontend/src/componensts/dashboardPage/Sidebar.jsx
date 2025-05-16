@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
+import { authAxios } from '../../utils/auth';
 
 // Add a ProjectModal component at the top of the file
 function ProjectModal({ isOpen, onClose, onSubmit }) {
@@ -68,9 +68,10 @@ function ProjectModal({ isOpen, onClose, onSubmit }) {
   );
 }
 
-// Add a FileModal component
-function FileModal({ isOpen, onClose, onSubmit, projectId }) {
+// Update the FileModal component
+function FileModal({ isOpen, onClose, onSubmit, projectId, folders = [] }) {
   const [fileName, setFileName] = useState('');
+  const [selectedFolder, setSelectedFolder] = useState('');
   const [isMainFile, setIsMainFile] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -83,9 +84,10 @@ function FileModal({ isOpen, onClose, onSubmit, projectId }) {
     setError(null);
     
     try {
-      await onSubmit(projectId, fileName, isMainFile);
+      await onSubmit(projectId, fileName, isMainFile, selectedFolder || null);
       setFileName('');
       setIsMainFile(false);
+      setSelectedFolder('');
       onClose();
     } catch (err) {
       setError(err.message || 'Failed to create file');
@@ -113,6 +115,24 @@ function FileModal({ isOpen, onClose, onSubmit, projectId }) {
             />
           </div>
           
+          {folders.length > 0 && (
+            <div className="mb-4">
+              <label className="block mb-2">Folder (optional)</label>
+              <select
+                value={selectedFolder}
+                onChange={(e) => setSelectedFolder(e.target.value)}
+                className="w-full p-2 bg-[#27004A] rounded text-[#F7EBFD] focus:outline-none focus:ring-2 focus:ring-purple-600"
+              >
+                <option value="">Root (No folder)</option>
+                {folders.map(folder => (
+                  <option key={folder.id} value={folder.id}>
+                    {folder.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          
           <div className="mb-4">
             <label className="flex items-center">
               <input
@@ -123,6 +143,73 @@ function FileModal({ isOpen, onClose, onSubmit, projectId }) {
               />
               Set as main file
             </label>
+          </div>
+          
+          {error && <p className="text-red-400 mb-4">{error}</p>}
+          
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-purple-800 rounded hover:bg-purple-700"
+              disabled={loading}
+            >
+              {loading ? 'Creating...' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Add after the FileModal component
+function FolderModal({ isOpen, onClose, onSubmit, projectId }) {
+  const [folderName, setFolderName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!folderName.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await onSubmit(projectId, folderName);
+      setFolderName('');
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to create folder');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-[#230B38] text-[#F7EBFD] p-6 rounded-lg shadow-lg w-96">
+        <h2 className="text-xl font-semibold mb-4">Create New Folder</h2>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block mb-2">Folder Name</label>
+            <input
+              type="text"
+              value={folderName}
+              onChange={(e) => setFolderName(e.target.value)}
+              className="w-full p-2 bg-[#27004A] rounded text-[#F7EBFD] focus:outline-none focus:ring-2 focus:ring-purple-600"
+              placeholder="Enter folder name"
+              autoFocus
+            />
           </div>
           
           {error && <p className="text-red-400 mb-4">{error}</p>}
@@ -167,6 +254,10 @@ const initialSections = [
 ];
 
 export default function Sidebar() {
+  // Add these state variables
+  const [folderModalOpen, setFolderModalOpen] = useState(false);
+  const [projectFolders, setProjectFolders] = useState({});
+  
   const [sections, setSections] = useState(initialSections);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -188,71 +279,159 @@ export default function Sidebar() {
     }
   }, [sections]);
 
+  // Add createFolder function to use the folder endpoint
+  const createFolder = async (projectId, folderName) => {
+    try {
+      const response = await authAxios.post('/api/files/folders/', {
+        name: folderName,
+        project: projectId
+      });
+      
+      // After successful creation, refresh projects and folders
+      await fetchProjects();
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error creating folder:', error);
+      throw new Error(
+        error.response?.data?.detail || 
+        error.message || 
+        'Failed to create folder'
+      );
+    }
+  };
+  
+  // Update createFile to handle folder selection
+  const createFile = async (projectId, fileName, isMain, folderId = null) => {
+    const projectIdValue = parseInt(projectId, 10) || projectId;
+    
+    const fileData = {
+      name: fileName,
+      content: `% ${fileName}\n% Created in CoTeX\n\n\\documentclass{article}\n\n\\begin{document}\n\nYour content here\n\n\\end{document}`,
+      project: projectIdValue,
+      is_main: isMain
+    };
+    
+    // Add folder ID if provided
+    if (folderId) {
+      fileData.folder = parseInt(folderId, 10) || folderId;
+    }
+    
+    console.log('Creating file with data:', fileData);
+    
+    try {
+      const response = await authAxios.post('/api/files/files/', fileData);
+      
+      await fetchProjects();
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error creating file:', error);
+      throw new Error(
+        error.response?.data?.detail || 
+        error.response?.data?.error || 
+        (error.response?.data?.project && `Project error: ${JSON.stringify(error.response.data.project)}`) ||
+        error.message || 
+        'Failed to create file'
+      );
+    }
+  };
+  
+  // Update fetchProjects to also fetch folders
   const fetchProjects = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Get the API URL, falling back to default if not set
-      const apiUrl = process.env.REACT_APP_API_URL || '';
-      const token = localStorage.getItem('access_token');
+      // Fetch projects first
+      const projectResponse = await authAxios.get('/api/projects/');
       
-      if (!token) {
-        throw new Error('Not authenticated. Please log in again.');
+      // Handle different response formats for projects
+      let projectsArray = [];
+      if (Array.isArray(projectResponse.data)) {
+        projectsArray = projectResponse.data;
+      } else if (projectResponse.data && typeof projectResponse.data === 'object') {
+        if (Array.isArray(projectResponse.data.results)) {
+          projectsArray = projectResponse.data.results;
+        } else {
+          projectsArray = Object.values(projectResponse.data);
+        }
       }
       
-      // Get projects from the API
-      const response = await axios.get(`${apiUrl}/api/projects/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      // Now fetch folders for each project
+      const foldersByProject = {};
+      const filesByFolder = {};
+      
+      // Get all folders
+      const foldersResponse = await authAxios.get('/api/files/folders/');
+      const folders = foldersResponse.data.results || foldersResponse.data;
+      
+      // Group folders by project
+      folders.forEach(folder => {
+        if (!foldersByProject[folder.project]) {
+          foldersByProject[folder.project] = [];
         }
+        foldersByProject[folder.project].push(folder);
+        filesByFolder[folder.id] = []; // Initialize empty array for files
       });
       
-      // Log the full response structure for debugging
-      console.log('API response:', response);
-      console.log('Response data type:', typeof response.data);
-      console.log('Response data:', response.data);
+      // Store folders by project for later use in the file modal
+      setProjectFolders(foldersByProject);
       
-      // Handle different response formats
-      let projectsArray = [];
-      if (Array.isArray(response.data)) {
-        // If response.data is already an array
-        projectsArray = response.data;
-      } else if (response.data && typeof response.data === 'object') {
-        // If response.data is an object with results property (common DRF pattern)
-        if (Array.isArray(response.data.results)) {
-          projectsArray = response.data.results;
-        } else {
-          // Try to convert the object to an array if possible
-          projectsArray = Object.values(response.data);
+      // Now organize files by folder
+      projectsArray.forEach(project => {
+        if (project.files) {
+          project.files.forEach(file => {
+            if (file.folder && filesByFolder[file.folder]) {
+              filesByFolder[file.folder].push(file);
+            }
+          });
         }
-      }
-      
-      // Make sure projectsArray is actually an array before proceeding
-      if (!Array.isArray(projectsArray)) {
-        console.error('Could not extract projects array from response:', response.data);
-        throw new Error('Unexpected API response format');
-      }
+      });
       
       // Update the projects section with the fetched data
       setSections(prevSections => {
         return prevSections.map(section => {
           if (section.id === 'projects') {
-            // Map the API response to our UI structure
-            const projectItems = projectsArray.map(project => ({
-              id: `project-${project.id}`,
-              type: 'project',
-              projectId: project.id,
-              title: project.name,
-              expanded: false,
-              items: (project.files || []).map(file => ({
-                id: `file-${file.id}`,
-                type: 'file',
-                fileId: file.id,
-                title: file.name || file.filename || 'Unnamed file',
-                isMain: !!file.is_main
-              }))
-            }));
+            const projectItems = projectsArray.map(project => {
+              const projectFolders = foldersByProject[project.id] || [];
+              
+              // Get files that are not in folders (root files)
+              const rootFiles = (project.files || []).filter(file => !file.folder);
+              
+              return {
+                id: `project-${project.id}`,
+                type: 'project',
+                projectId: project.id,
+                title: project.name,
+                expanded: false,
+                items: [
+                  // Add folders first
+                  ...projectFolders.map(folder => ({
+                    id: `folder-${folder.id}`,
+                    type: 'folder',
+                    folderId: folder.id,
+                    title: folder.name,
+                    expanded: false,
+                    items: (filesByFolder[folder.id] || []).map(file => ({
+                      id: `file-${file.id}`,
+                      type: 'file',
+                      fileId: file.id,
+                      title: file.name || file.filename || 'Unnamed file',
+                      isMain: !!file.is_main
+                    }))
+                  })),
+                  // Then add root files
+                  ...rootFiles.map(file => ({
+                    id: `file-${file.id}`,
+                    type: 'file',
+                    fileId: file.id,
+                    title: file.name || file.filename || 'Unnamed file',
+                    isMain: !!file.is_main
+                  }))
+                ]
+              };
+            });
             
             return {
               ...section,
@@ -263,13 +442,13 @@ export default function Sidebar() {
         });
       });
     } catch (err) {
-      console.error('Failed to fetch projects:', err);
+      console.error('Failed to fetch projects or folders:', err);
       setError(err.message || 'Failed to load projects. Please try again.');
     } finally {
       setLoading(false);
     }
   };
-
+  
   const handleDragStart = (e, idx) => {
     dragItemIndex.current = idx;
     setDragging(true);
@@ -346,6 +525,34 @@ export default function Sidebar() {
     });
   };
 
+  // Add function to toggle folder expansion
+  const toggleFolderExpand = (folderId) => {
+    setSections((prevSections) => {
+      return prevSections.map(section => {
+        if (section.id === 'projects') {
+          return {
+            ...section,
+            items: section.items.map(project => {
+              return {
+                ...project,
+                items: project.items.map(item => {
+                  if (item.type === 'folder' && item.id === folderId) {
+                    return {
+                      ...item,
+                      expanded: !item.expanded
+                    };
+                  }
+                  return item;
+                })
+              };
+            })
+          };
+        }
+        return section;
+      });
+    });
+  };
+
   const handleFileClick = (fileId) => {
     // You can implement file selection/opening logic here
     console.log(`Opening file with ID: ${fileId}`);
@@ -353,78 +560,15 @@ export default function Sidebar() {
 
   // Add createProject function
   const createProject = async (projectName) => {
-    const apiUrl = process.env.REACT_APP_API_URL || '';
-    const token = localStorage.getItem('access_token');
-    
-    if (!token) {
-      throw new Error('Not authenticated. Please log in again.');
-    }
-    
-    const response = await axios.post(`${apiUrl}/api/projects/`, 
-      { name: projectName },
-      { 
-        headers: { 'Authorization': `Bearer ${token}` }
-      }
-    );
+    // Use authAxios instead of axios with manual token handling
+    const response = await authAxios.post(`/api/projects/`, {
+      name: projectName
+    });
     
     // After successful creation, refresh projects
     await fetchProjects();
     
     return response.data;
-  };
-
-  // Update the createFile function
-  const createFile = async (projectId, fileName, isMain) => {
-    const apiUrl = process.env.REACT_APP_API_URL || '';
-    const token = localStorage.getItem('access_token');
-    
-    if (!token) {
-      throw new Error('Not authenticated. Please log in again.');
-    }
-    
-    // Make sure projectId is treated as an ID, not a string
-    const projectIdValue = parseInt(projectId, 10) || projectId;
-    
-    console.log('Creating file with data:', { 
-      name: fileName,
-      content: `% ${fileName}\n% Created in CoTeX\n\n\\documentclass{article}\n\n\\begin{document}\n\nYour content here\n\n\\end{document}`,
-      project: projectIdValue,
-      is_main: isMain 
-    });
-    
-    try {
-      const response = await axios.post(`${apiUrl}/api/files/files/`, 
-        { 
-          name: fileName,
-          content: `% ${fileName}\n% Created in CoTeX\n\n\\documentclass{article}\n\n\\begin{document}\n\nYour content here\n\n\\end{document}`,
-          project: projectIdValue, 
-          is_main: isMain 
-        },
-        { 
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      
-      // After successful creation, refresh projects to show the new file
-      await fetchProjects();
-      
-      return response.data;
-    } catch (error) {
-      console.error('Error creating file:', error);
-      console.error('Response data:', error.response?.data);
-      console.error('Request config:', error.config);
-      // Re-throw with more details for better error handling
-      throw new Error(
-        error.response?.data?.detail || 
-        error.response?.data?.error || 
-        (error.response?.data?.project && `Project error: ${JSON.stringify(error.response.data.project)}`) ||
-        error.message || 
-        'Failed to create file'
-      );
-    }
   };
 
   return (
@@ -498,17 +642,31 @@ export default function Sidebar() {
                             onClick={() => toggleProjectExpand(project.id)}
                           >
                             <span className="flex-1 text-left">{project.title}
-                              {/* Add New File button next to project title */}
-                              <button 
-                                className="ml-2 px-1.5 text-xs bg-[#27004A] rounded-full hover:bg-purple-800 inline-flex items-center justify-center"
-                                onClick={(e) => {
-                                  e.stopPropagation(); // Prevent toggling the project expansion
-                                  setActiveProjectId(project.projectId);
-                                  setFileModalOpen(true);
-                                }}
-                              >
-                                +
-                              </button>
+                              {/* Add buttons for file and folder creation */}
+                              <div className="inline-flex ml-2">
+                                <button 
+                                  className="px-1.5 text-xs bg-[#27004A] rounded-full hover:bg-purple-800 inline-flex items-center justify-center mr-1"
+                                  title="Add new file"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveProjectId(project.projectId);
+                                    setFileModalOpen(true);
+                                  }}
+                                >
+                                  <span>+F</span>
+                                </button>
+                                <button 
+                                  className="px-1.5 text-xs bg-[#27004A] rounded-full hover:bg-purple-800 inline-flex items-center justify-center"
+                                  title="Add new folder"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveProjectId(project.projectId);
+                                    setFolderModalOpen(true);
+                                  }}
+                                >
+                                  <span>+D</span>
+                                </button>
+                              </div>
                             </span>
                             <span
                               className={`text-xl transform transition-transform duration-200 ${
@@ -519,25 +677,75 @@ export default function Sidebar() {
                             </span>
                           </button>
                           
-                          {/* Files for this Project */}
+                          {/* Files and Folders for this Project */}
                           {project.expanded && (
                             <div className="ml-4 mt-1">
-                              {/* Files List */}
                               {project.items.length === 0 ? (
-                                <div className="text-sm text-gray-300 px-3 py-1">No files in this project</div>
+                                <div className="text-sm text-gray-300 px-3 py-1">No files or folders in this project</div>
                               ) : (
-                                project.items.map(file => (
-                                  <div 
-                                    key={file.id} 
-                                    className="px-3 py-1 text-sm rounded hover:bg-[#27004A] cursor-pointer flex items-center"
-                                    onClick={() => handleFileClick(file.fileId)}
-                                  >
-                                    <span className="flex-1">{file.title}</span>
-                                    {file.isMain && (
-                                      <span className="text-xs bg-purple-800 px-1 rounded">main</span>
-                                    )}
-                                  </div>
-                                ))
+                                project.items.map(item => {
+                                  if (item.type === 'folder') {
+                                    // Render folder with nested files
+                                    return (
+                                      <div key={item.id} className="mb-1">
+                                        <button
+                                          className="flex w-full items-center px-3 py-1 rounded hover:bg-[#27004A]"
+                                          onClick={() => toggleFolderExpand(item.id)}
+                                        >
+                                          <span className="flex-1 text-left flex items-center">
+                                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                            </svg>
+                                            {item.title}
+                                          </span>
+                                          <span
+                                            className={`text-sm transform transition-transform duration-200 ${
+                                              item.expanded ? 'rotate-90' : ''
+                                            }`}
+                                          >
+                                            {'>'}
+                                          </span>
+                                        </button>
+                                        
+                                        {/* Files inside folder */}
+                                        {item.expanded && (
+                                          <div className="ml-4 mt-1">
+                                            {item.items.length === 0 ? (
+                                              <div className="text-xs text-gray-300 px-3 py-1">Empty folder</div>
+                                            ) : (
+                                              item.items.map(file => (
+                                                <div 
+                                                  key={file.id} 
+                                                  className="px-3 py-1 text-sm rounded hover:bg-[#27004A] cursor-pointer flex items-center"
+                                                  onClick={() => handleFileClick(file.fileId)}
+                                                >
+                                                  <span className="flex-1">{file.title}</span>
+                                                  {file.isMain && (
+                                                    <span className="text-xs bg-purple-800 px-1 rounded">main</span>
+                                                  )}
+                                                </div>
+                                              ))
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  } else {
+                                    // Render regular file (outside of any folder)
+                                    return (
+                                      <div 
+                                        key={item.id} 
+                                        className="px-3 py-1 text-sm rounded hover:bg-[#27004A] cursor-pointer flex items-center"
+                                        onClick={() => handleFileClick(item.fileId)}
+                                      >
+                                        <span className="flex-1">{item.title}</span>
+                                        {item.isMain && (
+                                          <span className="text-xs bg-purple-800 px-1 rounded">main</span>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                })
                               )}
                             </div>
                           )}
@@ -563,12 +771,21 @@ export default function Sidebar() {
         onSubmit={createProject}
       />
       
+      {/* Folder Creation Modal */}
+      <FolderModal 
+        isOpen={folderModalOpen}
+        onClose={() => setFolderModalOpen(false)}
+        onSubmit={createFolder}
+        projectId={activeProjectId}
+      />
+      
       {/* File Creation Modal */}
       <FileModal 
         isOpen={fileModalOpen}
         onClose={() => setFileModalOpen(false)}
         onSubmit={createFile}
         projectId={activeProjectId}
+        folders={activeProjectId ? (projectFolders[activeProjectId] || []) : []}
       />
     </div>
   );
