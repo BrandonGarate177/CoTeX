@@ -391,7 +391,7 @@ export default function Sidebar() {
     
     try {
       // Make sure to use the correct endpoint - notice it's files/ not file/
-      const response = await axios.post(`${apiUrl}/api/files/`, 
+      const response = await axios.post(`${apiUrl}/api/files/files/`, 
         { 
           name: fileName,
           content: `% ${fileName}\n% Created in CoTeX\n\n\\documentclass{article}\n\n\\begin{document}\n\nYour content here\n\n\\end{document}`,
