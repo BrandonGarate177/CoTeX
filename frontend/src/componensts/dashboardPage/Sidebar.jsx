@@ -382,20 +382,22 @@ export default function Sidebar() {
       throw new Error('Not authenticated. Please log in again.');
     }
     
+    // Make sure projectId is treated as an ID, not a string
+    const projectIdValue = parseInt(projectId, 10) || projectId;
+    
     console.log('Creating file with data:', { 
       name: fileName,
       content: `% ${fileName}\n% Created in CoTeX\n\n\\documentclass{article}\n\n\\begin{document}\n\nYour content here\n\n\\end{document}`,
-      project: projectId,
+      project: projectIdValue,
       is_main: isMain 
     });
     
     try {
-      // Make sure to use the correct endpoint - notice it's files/ not file/
       const response = await axios.post(`${apiUrl}/api/files/files/`, 
         { 
           name: fileName,
           content: `% ${fileName}\n% Created in CoTeX\n\n\\documentclass{article}\n\n\\begin{document}\n\nYour content here\n\n\\end{document}`,
-          project: projectId,
+          project: projectIdValue, 
           is_main: isMain 
         },
         { 
@@ -411,11 +413,14 @@ export default function Sidebar() {
       
       return response.data;
     } catch (error) {
-      console.error('Error creating file:', error.response?.data || error);
+      console.error('Error creating file:', error);
+      console.error('Response data:', error.response?.data);
+      console.error('Request config:', error.config);
       // Re-throw with more details for better error handling
       throw new Error(
         error.response?.data?.detail || 
         error.response?.data?.error || 
+        (error.response?.data?.project && `Project error: ${JSON.stringify(error.response.data.project)}`) ||
         error.message || 
         'Failed to create file'
       );

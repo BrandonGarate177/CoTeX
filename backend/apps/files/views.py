@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from .models import File, Folder, GitFile
 from .serializers import FileSerializer, FolderSerializer, GitFileSerializer
 from apps.projects.models import Project
-
+from rest_framework.exceptions import ValidationError
 # Create your views here.
 
 class GitFileViewSet(viewsets.ReadOnlyModelViewSet):
@@ -58,16 +58,37 @@ class FileViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        # Set appropriate project based on folder if present
+        # Get project_id from request data
+        project_id = self.request.data.get('project')
         folder_id = self.request.data.get('folder')
+        
+        # Case 1: Folder specified - use folder's project
         if folder_id:
             try:
                 folder = Folder.objects.get(id=folder_id)
+                # Verify user has access to this folder
+                if folder.project.owner != self.request.user:
+                    raise PermissionError("You don't have permission to add files to this folder")
                 serializer.save(project=folder.project)
+                return
             except Folder.DoesNotExist:
-                pass
+                raise ValidationError({"folder": "Specified folder does not exist"})
+        
+        # Case 2: Project specified directly
+        elif project_id:
+            try:
+                project = Project.objects.get(id=project_id)
+                # Verify user has access to this project
+                if project.owner != self.request.user:
+                    raise PermissionError("You don't have permission to add files to this project")
+                serializer.save(project=project)
+                return
+            except Project.DoesNotExist:
+                raise ValidationError({"project": "Specified project does not exist"})
+        
+        # Case 3: Neither project nor folder specified
         else:
-            serializer.save()
+            raise ValidationError({"error": "Either project or folder must be specified"})
 
 class FolderViewSet(viewsets.ModelViewSet):
     """
