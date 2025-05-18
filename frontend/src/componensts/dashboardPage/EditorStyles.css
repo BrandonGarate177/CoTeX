@@ -1,184 +1,86 @@
-/* Overall editor container styling */
-@import 'prismjs/themes/prism-tomorrow.css';
-@import 'prismjs/themes/prism-okaidia.css';
-
-.cotex-editor-container {
-  width: 100%;
-  overflow: auto;
-  transition: height 0.3s ease;
-}
-
-/* Override MDXEditor default styles */
-.cotex-editor-container .mdxeditor {
+.tiptap-container {
+  display: flex;
+  flex-direction: column;
   height: 100%;
-  width: 100%;
-  background-color: transparent;
+  background-color: rgba(20, 20, 30, 0.5);
 }
 
-/* Target the editable content area */
-.cotex-editor-content {
-  color: white !important;
-  font-size: 16px;
-  line-height: 1.6;
-  min-height: 100%;
-}
-
-/* Style headings */
-.cotex-editor-content h1 {
-  font-size: 2.25rem; /* ~36px */
-  font-weight: 700;
-  margin: 1.5rem 0 1rem;
-}
-
-.cotex-editor-content h2 {
-  font-size: 1.875rem; /* ~30px */
-  font-weight: 600;
-  margin: 1.25rem 0 0.75rem;
-}
-
-.cotex-editor-content h3 {
-  font-size: 1.5rem; /* ~24px */
-  font-weight: 600;
-  margin: 1rem 0 0.5rem;
-}
-
-.cotex-editor-content h4 {
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.cotex-editor-content h5 {
-  font-size: 1.125rem;
-}
-
-.cotex-editor-content h6 {
-  font-size: 1rem;
-  font-weight: 500;
-}
-
-
-/* Style toolbar if visible */
-.cotex-editor-container [role="toolbar"] {
-  background-color: rgba(30, 34, 42, 0.95);
+.tiptap-toolbar {
+  padding: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  background-color: rgba(35, 11, 56, 0.9);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Style toolbar buttons */
-.cotex-editor-container button {
-  color: rgba(255, 255, 255, 0.85);
+.tiptap-toolbar button {
+  background-color: rgba(247, 235, 253, 0.8);
+  color: #230B38;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-/* Style code blocks differently */
-.cotex-editor-content pre {
-  background-color: rgba(20, 24, 32, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+.tiptap-toolbar button:hover {
+  background-color: rgba(247, 235, 253, 1);
 }
 
-/* Links and other inline elements */
-.cotex-editor-content a {
-  color: #61dafb;
+.tiptap-toolbar button.is-active {
+  background-color: #673AB7;
+  color: white;
 }
 
-/* Inline code */
-.cotex-editor-content code {
-  background-color: rgba(255, 255, 255, 0.1);
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-family: 'Fira Code', monospace;
-  font-size: 0.95rem;
-  color: #c0caf5;
+.tiptap-editor {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  color: #F7EBFD;
 }
 
-/* Code blocks */
-.cotex-editor-content pre {
-  background-color: rgba(30, 34, 42, 0.9);
-  padding: 12px 16px;
-  border-radius: 6px;
-  font-family: 'Fira Code', monospace;
-  font-size: 0.9rem;
-  line-height: 1.6;
+.tiptap-editor .ProseMirror {
+  height: 100%;
+  outline: none;
+}
+
+/* Math styles */
+.tiptap-editor .math-inline {
+  color: #ACF7C1;
+  padding: 0 0.25rem;
+  background-color: rgba(172, 247, 193, 0.1);
+  border-radius: 0.25rem;
+}
+
+.tiptap-editor .math-block {
+  color: #ACF7C1;
+  padding: 0.5rem;
+  background-color: rgba(172, 247, 193, 0.1);
+  margin: 1rem 0;
+  border-radius: 0.25rem;
+}
+
+/* Code block styles */
+.tiptap-editor pre {
+  background-color: rgba(0, 0, 0, 0.4);
+  border-radius: 0.25rem;
+  padding: 0.75rem;
+  margin: 1rem 0;
   overflow-x: auto;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  color: #e0e0e0;
 }
 
-/* Add these specific MDXEditor code block styles */
-
-/* Target MDX specific code block classes */
-.cotex-editor-content .code-block {
-  background-color: rgba(30, 34, 42, 0.9) !important;
-  border-radius: 6px !important;
-  margin: 1rem 0 !important;
-  overflow: visible !important; /* Allow language badge to show */
+.tiptap-editor code {
+  font-family: 'Source Code Pro', monospace;
+  color: #E3D2FF;
 }
 
-/* Target the code element within MDXEditor */
-.cotex-editor-content .code-block > div {
-  color: white !important;
-  background-color: transparent !important;
-}
-
-/* Code fence styling (backticks) */
-.cotex-editor-content .code-fence {
-  color: #666 !important;
-  background-color: transparent !important;
-  font-family: 'Fira Code', monospace !important;
-}
-
-/* Language identifier */
-.cotex-editor-content .language-info {
-  position: absolute;
-  top: 0;
-  right: 8px;
-  color: #999;
-  font-size: 0.85rem;
-  background-color: rgba(0, 0, 0, 0.3);
-  padding: 2px 6px;
-  border-radius: 4px;
-  z-index: 10;
-}
-
-/* Target syntax highlighting tokens */
-.cotex-editor-content .token.comment { color: #6a9955; }
-.cotex-editor-content .token.string { color: #ce9178; }
-.cotex-editor-content .token.number { color: #b5cea8; }
-.cotex-editor-content .token.keyword { color: #569cd6; }
-.cotex-editor-content .token.operator { color: #d4d4d4; }
-.cotex-editor-content .token.punctuation { color: #d4d4d4; }
-.cotex-editor-content .token.function { color: #dcdcaa; }
-.cotex-editor-content .token.property { color: #9cdcfe; }
-.cotex-editor-content .token.class-name { color: #4ec9b0; }
-
-/* Fix for toolbar code block button */
-.cotex-editor-container [aria-label="Insert code block"] {
-  background-color: rgba(80, 84, 92, 0.4);
-  border-radius: 4px;
-  margin: 0 4px;
-}
-
-/* Fix any conflicting pre styles - ensure this comes after the earlier pre style */
-.cotex-editor-content pre code {
-  background-color: transparent;
-  padding: 0;
-  font-family: 'Fira Code', monospace;
-  color: #e0e0e0;
-}
-
-/* Ensure the code block is properly contained */
-.cotex-editor-content .code-block pre {
-  margin: 0;
-  padding-top: 24px; /* Space for language tag */
-}
-
-/* Fix markdown preview mode for code blocks */
-.mdxeditor-markdown-preview pre {
-  background-color: rgba(30, 34, 42, 0.9) !important;
-  color: #e0e0e0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.05) !important;
-}
-
-/* Ensure code block buttons are visible */
-.mdxeditor-toolbar-wrapper {
-  background-color: rgba(30, 34, 42, 0.95) !important;
+/* Rendered preview styles */
+.rendered-preview {
+  background-color: rgba(20, 20, 30, 0.3);
+  color: #F7EBFD;
+  font-size: 1rem;
+  line-height: 1.6;
+  padding: 1.5rem;
 }

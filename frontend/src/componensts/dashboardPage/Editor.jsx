@@ -1,169 +1,165 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  MDXEditor, 
-  headingsPlugin,
-  listsPlugin,
-  quotePlugin,
-  thematicBreakPlugin,
-  markdownShortcutPlugin,
-  tablePlugin,
-  codeBlockPlugin,
-  linkPlugin,
-  imagePlugin,
-  frontmatterPlugin,
-  diffSourcePlugin,
-  toolbarPlugin,
-  InsertCodeBlock,
-  UndoRedo,
-  BoldItalicUnderlineToggles,
-  BlockTypeSelect,
-  CreateLink
-} from '@mdxeditor/editor';
-import '@mdxeditor/editor/style.css';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+
+
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+
+
+import {Markdown} from 'tiptap-markdown';
+
+
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import Document from '@tiptap/extension-document';
+import Placeholder from '@tiptap/extension-placeholder';
+
+import { common, createLowlight } from 'lowlight';
+import { MathInline, MathBlock } from './extensions/MathInline';
+
 import './EditorStyles.css';
+import 'katex/dist/katex.min.css';
 
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
+// Lowlight instance for code syntax highlighting
+const lowlight = createLowlight(common);
 
-export default function Editor({ initialContent = '# Welcome to CoTeX\n\nStart writing your document here...', onContentChange }) {
-  const [markdown, setMarkdown] = useState(initialContent);
-  const [editorHeight, setEditorHeight] = useState('600px');
+export default function Editor() {
+  const [width, setWidth] = useState(50); // Editor pane width (%)
+  const [isResizing, setIsResizing] = useState(false);
+  const [preview, setPreview] = useState('');
+  const containerRef = useRef(null);
 
-  // Adjust editor height based on window size
-  useEffect(() => {
-    const handleResize = () => {
-      const viewportHeight = window.innerHeight;
-      setEditorHeight(`${Math.max(400, viewportHeight * 0.7)}px`);
-    };
-    
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+  // Initial markdown + LaTeX content
+  const initialContent = `# Welcome to CoTeX
+
+This is a markdown and LaTeX editor. You can write:
+
+## Mathematics
+
+$$E = mc^2$$
+
+Or inline math like $f(x) = x^2$
+
+## Code blocks
+
+\`\`\`python
+function helloWorld() {
+  console.log("Hello, CoTeX!");
+}
+\`\`\`
+
+## And more...
+`;
+
+  // Initialize TipTap editor
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({ codeBlock: false }),
+      Document,
+      Markdown,
+      CodeBlockLowlight.configure({ lowlight }),
+      MathInline,
+      MathBlock,
+      Placeholder.configure({ placeholder: 'Start writing your LaTeX/Markdown here...' }),
+    ],
+    content: initialContent,
+    onCreate({ editor }) {
+      setPreview(editor.getHTML());
+    },
+    onUpdate({ editor }) {
+      setPreview(editor.getHTML());
+    },
+  });
+
+  // Begin resizing
+  const startResizing = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
   }, []);
 
-  const handleChange = (content) => {
-    setMarkdown(content);
-    if (onContentChange) {
-      onContentChange(content);
+  // Handle mouse movements while resizing
+  useEffect(() => {
+    function onMouseMove(e) {
+      if (!isResizing || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const percent = ((e.clientX - rect.left) / rect.width) * 100;
+      setWidth(Math.min(Math.max(percent, 20), 80));
     }
-  };
+    function onMouseUp() {
+      setIsResizing(false);
+    }
 
-  // Define a custom code block editor descriptor
-  const customCodeBlockDescriptor = {
-    match: (node) => node.name ==='fencedCode',
-    priority: 1,
-    name: 'custom-code-block',
-    Editor: ({code, language, onChange}) => {
-      // Safe handler for onChange - checks if it's a function first
-      const handleChange = (e) => {
-        if (typeof onChange === 'function') {
-          onChange(e.target.value);
-        }
-      };
-      
-      return (
-        <div style={{ 
-          position: 'relative',
-          backgroundColor: 'rgba(20, 20, 20, 0.8)',
-          borderRadius: '4px',
-          padding: '8px',
-          margin: '8px 0'
-        }}>
-          <div style={{ 
-            position: 'absolute', 
-            top: '4px', 
-            right: '8px', 
-            fontSize: '12px',
-            color: '#aaa',
-            padding: '2px 6px',
-            borderRadius: '3px',
-            backgroundColor: 'rgba(0,0,0,0.3)'
-          }}>
-            {language || 'text'}
-          </div>
-          <SyntaxHighlighter 
-            language={language || 'text'} 
-            style={tomorrow}
-            customStyle={{
-              margin: '0',
-              padding: '16px 8px 8px 8px',
-              backgroundColor: 'transparent',
-              color: 'white'
-            }}
-          >
-            {code || ''}
-          </SyntaxHighlighter>
-          <textarea
-            value={code || ''}
-            onChange={handleChange} // Use our safe handler
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              opacity: 0,
-              cursor: 'text'
-            }}
-          />
-        </div>
-      );
+    if (isResizing) {
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
     }
-  };
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isResizing]);
 
   return (
-    <div 
-      className="cotex-editor-container" 
-      style={{ 
-        height: editorHeight,
-        backgroundColor: 'rgba(40, 44, 52, 0.85)',
-        borderRadius: '8px',
-        padding: '16px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-      }}
-    >
-      <MDXEditor
-        markdown={markdown}
-        onChange={handleChange}
-        contentEditableClassName="cotex-editor-content"
-        className="cotex-mdx-editor"
-        plugins={[
-          toolbarPlugin({
-            toolbarContents: () => (
-              <> 
-                <UndoRedo />
-                <BoldItalicUnderlineToggles />
-                <BlockTypeSelect />
-                <CreateLink />
-                <InsertCodeBlock />
-              </>
-            )
-          }),
-          headingsPlugin(),
-          listsPlugin(),
-          quotePlugin(),
-          thematicBreakPlugin(),
-          markdownShortcutPlugin({
-            codeBlock: {
-              trigger: '```',
-              shortcut: 'Enter'
-            }
-          }),
-          tablePlugin(),
-          codeBlockPlugin({ 
-            defaultLanguage: 'latex',
-            codeBlockEditorDescriptors: [customCodeBlockDescriptor], // IMPORTANT: Register the descriptor here
-            enabledLanguages: ['latex', 'tex', 'python', 'javascript', 'html', 'css', 'java', 'c', 'cpp'],
-            usageStatistics: false
-          }),
-          linkPlugin(),
-          imagePlugin(),
-          frontmatterPlugin(),
-          diffSourcePlugin({
-            viewMode: 'rich-text',
-            diffMarkdown: markdown,
-          }),
-        ]}
+    <div className="flex h-full" ref={containerRef}>
+      {/* Editor Pane */}
+      <div
+        className="overflow-auto rounded-md shadow-lg tiptap-container"
+        style={{ width: `${width}%` }}
+      >
+        {/* Toolbar */}
+        {editor && (
+          <div className="tiptap-toolbar">
+            <button
+              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+              className={editor.isActive('heading', { level: 1 }) ? 'is-active' : ''}
+            >
+              H1
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+              className={editor.isActive('heading', { level: 2 }) ? 'is-active' : ''}
+            >
+              H2
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              className={editor.isActive('bold') ? 'is-active' : ''}
+            >
+              Bold
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              className={editor.isActive('italic') ? 'is-active' : ''}
+            >
+              Italic
+            </button>
+            <button onClick={() => editor.chain().focus().insertMathBlock().run()}>
+              TeX Block
+            </button>
+            <button onClick={() => editor.chain().focus().insertMathInline().run()}>
+              TeX Inline
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+              className={editor.isActive('codeBlock') ? 'is-active' : ''}
+            >
+              Code Block
+            </button>
+          </div>
+        )}
+
+        {/* Editor Content */}
+        <EditorContent editor={editor} className="tiptap-editor" />
+      </div>
+
+      {/* Resize Handle */}
+      <div
+        className="w-0.5 cursor-col-resize bg-purple-500 hover:bg-purple-300 transition-colors"
+        onMouseDown={startResizing}
+      />
+
+      {/* Live Preview */}
+      <div
+        className="flex-grow p-4 overflow-auto rendered-preview"
+        dangerouslySetInnerHTML={{ __html: preview }}
       />
     </div>
   );
