@@ -24,12 +24,12 @@ class NoteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Note
         fields = [
-            'id', 'title', 'slug', 'content', 'rendered_html', 
+            'id', 'title', 'slug', 'content',  
             'created_at', 'updated_at', 'file', 'folder', 'project',
             'tags', 'parent_type', 'parent_name', 'parent_id'
         ]
-        read_only_fields = ['rendered_html', 'slug', 'parent_type', 'parent_name', 'parent_id']
-    
+        read_only_fields = ['slug', 'parent_type', 'parent_name', 'parent_id']
+
     def get_tags(self, obj):
         tags = NoteTag.objects.filter(taggings__note=obj)
         return NoteTagSerializer(tags, many=True).data
@@ -78,14 +78,12 @@ class NoteSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         note = Note.objects.create(**validated_data)
-        note.render_content()  # Render the HTML content
         note.save()
         return note
     
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        instance.render_content()  # Re-render the HTML content
         instance.save()
         return instance
 

@@ -1,0 +1,107 @@
+.tiptap-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: rgba(20, 20, 30, 0.5);
+}
+
+.tiptap-toolbar {
+  padding: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  background-color: rgba(35, 11, 56, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tiptap-toolbar button {
+  background-color: rgba(247, 235, 253, 0.8);
+  color: #230B38;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.tiptap-toolbar button:hover {
+  background-color: rgba(247, 235, 253, 1);
+}
+
+.tiptap-toolbar button.is-active {
+  background-color: #673AB7;
+  color: white;
+}
+
+.tiptap-editor {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  color: #F7EBFD;
+}
+
+.tiptap-editor .ProseMirror {
+  height: 100%;
+  outline: none;
+}
+
+/* Math styles */
+.tiptap-editor .math-inline {
+  color: #ACF7C1;
+  padding: 0 0.25rem;
+  background-color: rgba(172, 247, 193, 0.1);
+  border-radius: 0.25rem;
+}
+
+.tiptap-editor .math-block {
+  color: #ACF7C1;
+  padding: 0.5rem;
+  background-color: rgba(172, 247, 193, 0.1);
+  margin: 1rem 0;
+  border-radius: 0.25rem;
+}
+
+/* Code block styles */
+.tiptap-editor pre {
+  background-color: rgba(0, 0, 0, 0.4);
+  border-radius: 0.25rem;
+  padding: 0.75rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.tiptap-editor code {
+  font-family: 'Source Code Pro', monospace;
+  color: #E3D2FF;
+}
+
+/* Rendered preview styles */
+.rendered-preview {
+  background-color: rgba(20, 20, 30, 0.3);
+  color: #F7EBFD;
+  font-size: 1rem;
+  line-height: 1.6;
+  padding: 1.5rem;
+}
+
+/* Add this to your EditorStyles.css */
+.math-inline {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.math-block {
+  display: block;
+  margin: 1em 0;
+  text-align: center;
+}
+
+.katex-error {
+  color: red;
+  border: 1px dashed red;
+  padding: 0.2em;
+}
+.math-block {
+  margin: 1em 0;
+}

@@ -1,114 +1,177 @@
-import React, { useState, useEffect, useRef } from 'react';
-import CodeMirror from '@uiw/react-codemirror';
-import { markdown } from '@codemirror/lang-markdown';
-import { EditorView } from '@codemirror/view';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import {Markdown} from 'tiptap-markdown';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import Document from '@tiptap/extension-document';
+import Placeholder from '@tiptap/extension-placeholder';
+import { common, createLowlight } from 'lowlight';
+
+import { MathInline } from '../../extensions/MathInLine';
+import { MathBlock } from '../../extensions/MathBlock';
+import { MathPlugin } from '../../extensions/MathPlugin';
+
+import './EditorStyles.css';
+import 'katex/dist/katex.min.css';
+
+// Lowlight instance for code syntax highlighting
+const lowlight = createLowlight(common);
 
 export default function Editor() {
-  const [content, setContent] = useState('% Start writing your LaTeX/Markdown here\n\n# Welcome to CoTeX\n\nThis is a markdown and LaTeX editor. You can write:\n\n## Mathematics\n\n$$E = mc^2$$\n\nOr inline math like $f(x) = x^2$\n\n## Code blocks\n\n```python\ndef hello_world():\n    print("Hello, CoTeX!")\n```\n\n## And more...');
+  const [width, setWidth] = useState(50); // Editor pane width (%)
   const [isResizing, setIsResizing] = useState(false);
-  const resizableRef = useRef(null);
-  const initialWidth = 50; // Starting at 50% width
-  const [width, setWidth] = useState(initialWidth);
+  const [preview, setPreview] = useState('');
   const containerRef = useRef(null);
 
-  const onChange = React.useCallback((value) => {
-    setContent(value);
-    // Here you could implement auto-saving or sync with backend
-  }, []);
+  // Initial markdown + LaTeX content
+  const initialContent = `# Welcome to CoTeX
 
-  // Add resize functionality
-  const startResizing = React.useCallback((mouseDownEvent) => {
-    mouseDownEvent.preventDefault();
-    setIsResizing(true);
-  }, []);
+This is a markdown and LaTeX editor. You can write:
 
-  // Handle mouse move for resizing
-  useEffect(() => {
-    const handleMouseMove = (mouseMoveEvent) => {
-      if (isResizing && containerRef.current) {
-        const containerRect = containerRef.current.getBoundingClientRect();
-        // Calculate percentage based on mouse position relative to container
-        const mouseXRelativeToContainer = mouseMoveEvent.clientX - containerRect.left;
-        const newWidth = (mouseXRelativeToContainer / containerRect.width) * 100;
-        
-        // Limit to reasonable bounds (20% to 80%)
-        setWidth(Math.min(Math.max(newWidth, 20), 80));
-      }
-    };
+## Mathematics
 
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
+$$ E = mc^2 $$
 
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
+Or inline math like $f(x) = x^2$
 
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing]);
+## Code blocks
 
-  // Custom theme with semi-transparent background
-  const semiTransparentTheme = EditorView.theme({
-    '&': {
-      backgroundColor: 'rgba(20, 20, 30, 0.5) !important', // More opaque background
+\`\`\`python
+function helloWorld() {
+  console.log("Hello, CoTeX!");
+}
+\`\`\`
+
+## And more...
+`;
+
+  // Initialize TipTap editor
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({ codeBlock: false }),
+      Document,
+      CodeBlockLowlight.configure({ lowlight }),
+
+      MathInline,
+      MathBlock,
+      
+      Markdown,
+      Placeholder.configure({ placeholder: 'Start writing your LaTeX/Markdown here...' }),
+    ],
+    content: initialContent,
+    onCreate({ editor }) {
+      setPreview(editor.getHTML());
     },
-    '.cm-scroller': {
-      backgroundColor: 'transparent !important',
+    onUpdate({ editor }) {
+      setPreview(editor.getHTML());
     },
-    '.cm-content': {
-      backgroundColor: 'transparent !important',
-    },
-    '.cm-line': {
-      backgroundColor: 'transparent !important',
-    },
-    '.cm-gutters': {
-      backgroundColor: 'rgba(0, 0, 0, 0.4) !important',
-      borderRight: '1px solid rgba(255, 255, 255, 0.1) !important',
-    },
-    '.cm-activeLineGutter': {
-      backgroundColor: 'rgba(255, 255, 255, 0.1) !important',
-    },
-    '.cm-activeLine': {
-      backgroundColor: 'rgba(255, 255, 255, 0.07) !important',
+    editorProps: {
+      // Add the MathPlugin to properly process math expressions
+      attributes: {
+        class: 'cotex-editor',
+      },
     },
   });
 
+  // Add MathPlugin after editor is created
+  useEffect(() => {
+    if (editor) {
+      editor.registerPlugin(MathPlugin(editor));
+    }
+  }, [editor]);
+
+  // Begin resizing
+  const startResizing = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  // Handle mouse movements while resizing
+  useEffect(() => {
+    function onMouseMove(e) {
+      if (!isResizing || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const percent = ((e.clientX - rect.left) / rect.width) * 100;
+      setWidth(Math.min(Math.max(percent, 20), 80));
+    }
+    function onMouseUp() {
+      setIsResizing(false);
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    }
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isResizing]);
+
   return (
     <div className="flex h-full" ref={containerRef}>
-      {/* Editor container with semi-transparent background */}
-      <div 
-        ref={resizableRef}
-        className="overflow-auto rounded-md shadow-lg"
+      {/* Editor Pane */}
+      <div
+        className="overflow-auto rounded-md shadow-lg tiptap-container"
         style={{ width: `${width}%` }}
       >
-        <CodeMirror
-          value={content}
-          height="100%"
-          extensions={[markdown(), semiTransparentTheme]}
-          onChange={onChange}
-          theme="dark"
-          basicSetup={{
-            lineNumbers: true,
-            foldGutter: true,
-            autocompletion: true,
-          }}
-          style={{ fontSize: '16px' }}
-          className="h-full"
-        />
+        {/* Toolbar */}
+        {editor && (
+          <div className="tiptap-toolbar">
+            <button
+              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+              className={editor.isActive('heading', { level: 1 }) ? 'is-active' : ''}
+            >
+              H1
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+              className={editor.isActive('heading', { level: 2 }) ? 'is-active' : ''}
+            >
+              H2
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              className={editor.isActive('bold') ? 'is-active' : ''}
+            >
+              Bold
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              className={editor.isActive('italic') ? 'is-active' : ''}
+            >
+              Italic
+            </button>
+            <button onClick={() => editor.chain().focus().insertMathBlock().run()}>
+              TeX Block
+            </button>
+            <button onClick={() => editor.chain().focus().insertMathInline().run()}>
+              TeX Inline
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+              className={editor.isActive('codeBlock') ? 'is-active' : ''}
+            >
+              Code Block
+            </button>
+          </div>
+        )}
+
+        {/* Editor Content */}
+        <EditorContent editor={editor} className="tiptap-editor" />
       </div>
-      
-      {/* Resize handle */}
+
+      {/* Resize Handle */}
       <div
         className="w-0.5 cursor-col-resize bg-purple-500 hover:bg-purple-300 transition-colors"
         onMouseDown={startResizing}
       />
-      
-      {/* This empty div takes up the remaining space */}
-      <div className="flex-grow"></div>
+
+      {/* Live Preview */}
+      <div
+        className="flex-grow p-4 overflow-auto rendered-preview"
+        dangerouslySetInnerHTML={{ __html: preview }}
+      />
     </div>
   );
 }
