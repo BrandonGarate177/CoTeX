@@ -1,19 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-
-
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-
-
 import {Markdown} from 'tiptap-markdown';
-
-
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import Document from '@tiptap/extension-document';
 import Placeholder from '@tiptap/extension-placeholder';
-
 import { common, createLowlight } from 'lowlight';
-import { MathInline, MathBlock } from './extensions/MathInline';
+
+import { MathInline } from '../../extensions/MathInLine';
+import { MathBlock } from '../../extensions/MathBlock';
+import { MathPlugin } from '../../extensions/MathPlugin';
 
 import './EditorStyles.css';
 import 'katex/dist/katex.min.css';
@@ -34,7 +30,7 @@ This is a markdown and LaTeX editor. You can write:
 
 ## Mathematics
 
-$$E = mc^2$$
+$$ E = mc^2 $$
 
 Or inline math like $f(x) = x^2$
 
@@ -54,10 +50,12 @@ function helloWorld() {
     extensions: [
       StarterKit.configure({ codeBlock: false }),
       Document,
-      Markdown,
       CodeBlockLowlight.configure({ lowlight }),
+
       MathInline,
       MathBlock,
+      
+      Markdown,
       Placeholder.configure({ placeholder: 'Start writing your LaTeX/Markdown here...' }),
     ],
     content: initialContent,
@@ -67,7 +65,20 @@ function helloWorld() {
     onUpdate({ editor }) {
       setPreview(editor.getHTML());
     },
+    editorProps: {
+      // Add the MathPlugin to properly process math expressions
+      attributes: {
+        class: 'cotex-editor',
+      },
+    },
   });
+
+  // Add MathPlugin after editor is created
+  useEffect(() => {
+    if (editor) {
+      editor.registerPlugin(MathPlugin(editor));
+    }
+  }, [editor]);
 
   // Begin resizing
   const startResizing = useCallback((e) => {

@@ -84,3 +84,24 @@
   line-height: 1.6;
   padding: 1.5rem;
 }
+
+/* Add this to your EditorStyles.css */
+.math-inline {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.math-block {
+  display: block;
+  margin: 1em 0;
+  text-align: center;
+}
+
+.katex-error {
+  color: red;
+  border: 1px dashed red;
+  padding: 0.2em;
+}
+.math-block {
+  margin: 1em 0;
+}
