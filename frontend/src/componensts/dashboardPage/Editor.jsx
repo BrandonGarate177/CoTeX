@@ -1,177 +1,353 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import {Markdown} from 'tiptap-markdown';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import Document from '@tiptap/extension-document';
-import Placeholder from '@tiptap/extension-placeholder';
-import { common, createLowlight } from 'lowlight';
-
-import { MathInline } from '../../extensions/MathInLine';
-import { MathBlock } from '../../extensions/MathBlock';
-import { MathPlugin } from '../../extensions/MathPlugin';
-
-import './EditorStyles.css';
+import React, { useState, useEffect, useRef} from "react";
+import katex from "katex";
 import 'katex/dist/katex.min.css';
 
-// Lowlight instance for code syntax highlighting
-const lowlight = createLowlight(common);
+function parseLine(line){
+  // Code block
+  if(/^```/.test(line)){
+    return `<pre><code>${line.replace(/^```/, '')}</code></pre>`;
+  }
 
-export default function Editor() {
-  const [width, setWidth] = useState(50); // Editor pane width (%)
-  const [isResizing, setIsResizing] = useState(false);
-  const [preview, setPreview] = useState('');
-  const containerRef = useRef(null);
+  // Math block
+  if (/^\$\$/.test(line)) {
+    return `<div class="math-block">${katex.renderToString(
+      line.replace(/^\$\$|\$\$$/g, ''),
+      { displayMode: true, throwOnError: false }
+    )}</div>`;
+  }
 
-  // Initial markdown + LaTeX content
-  const initialContent = `# Welcome to CoTeX
+  // Headers
+  const hMatch = line.match(/^(#{1,6})\s*(.+)/);
+  if (hMatch){
+    const level = hMatch[1].length;
+    return `<h${level}>${hMatch[2]}</h${level}>`;
+  }
 
-This is a markdown and LaTeX editor. You can write:
+  // Math INLINE
+  line = line
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>');
 
-## Mathematics
-
-$$ E = mc^2 $$
-
-Or inline math like $f(x) = x^2$
-
-## Code blocks
-
-\`\`\`python
-function helloWorld() {
-  console.log("Hello, CoTeX!");
+  // code INLINE
+  line = line.replace(/`(.+?)`/g, '<code>$1</code>');
+  return `<p>${line}</p>`;
 }
-\`\`\`
 
-## And more...
-`;
+// Going to render each line separately
+function toBlocks(lines) {
+  const blocks = [];
+  let i = 0;
 
-  // Initialize TipTap editor
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ codeBlock: false }),
-      Document,
-      CodeBlockLowlight.configure({ lowlight }),
+  while (i < lines.length) {
+    const line = lines[i];
 
-      MathInline,
-      MathBlock,
+    // 1) code fence
+    if (line.startsWith("```")) {
+      const lang = line.slice(3).trim();  // e.g. ```js
+      i++;
+      const buffer = [];
+      // collect until closing ```
+      while (i < lines.length && !lines[i].startsWith("```")) {
+        buffer.push(lines[i]);
+        i++;
+      }
+      // skip the closing ```
+      i++;
+      blocks.push({ type: "code", lang, content: buffer.join("\n") });
+      continue;
+    }
+
+    // 2) math fence
+    if (line.startsWith("$$")) {
+      i++;
+      const buffer = [];
+      // collect until closing $$
+      while (i < lines.length && !lines[i].startsWith("$$")) {
+        buffer.push(lines[i]);
+        i++;
+      }
+      i++;
+      blocks.push({ type: "math", content: buffer.join("\n") });
+      continue;
+    }
+
+    // 3) plain line
+    blocks.push({ type: "line", content: line });
+    i++;
+  }
+
+  return blocks;
+}
+
+const headerStyles = {
+  h1: { fontSize: '2em', fontWeight: 'bold', margin: '0.67em 0' },
+  h2: { fontSize: '1.5em', fontWeight: 'bold', margin: '0.83em 0' },
+  h3: { fontSize: '1.17em', fontWeight: 'bold', margin: '1em 0' },
+  h4: { fontSize: '1em', fontWeight: 'bold', margin: '1.33em 0' },
+  h5: { fontSize: '0.83em', fontWeight: 'bold', margin: '1.67em 0' },
+  h6: { fontSize: '0.67em', fontWeight: 'bold', margin: '2.33em 0' },
+};
+
+export default function Editor({ content = "", onContentChange }) {
+  const [blocks, setBlocks] = useState(() => toBlocks(content.split("\n")));
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const textareaRef = useRef(null);
+  const blockEditableTypes = ["line", "code", "math"];
+
+  // initialize if content prop changes
+  useEffect(() => {
+    setBlocks(toBlocks(content.split("\n")));
+  }, [content]);
+
+  // focus the textarea whenever currentIndex changes
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (ta) {
+      ta.focus();
+      // place cursor at end
+      if (blocks[currentIndex]?.type === "line") {
+        const len = blocks[currentIndex]?.content?.length || 0;
+        ta.setSelectionRange(len, len);
+      }
+    }
+  }, [currentIndex, blocks]);
+
+  // utility to update the current block content
+  const updateBlockContent = (idx, newContent) => {
+    setBlocks((prev) => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], content: newContent };
+      return copy;
+    });
+  };
+
+  // when the user blurs out of textarea, notify parent
+  const handleBlur = () => {
+    // Convert blocks back to text
+    const lines = [];
+    blocks.forEach(block => {
+      if (block.type === "code") {
+        lines.push(`\`\`\`${block.lang || ""}`);
+        lines.push(...block.content.split("\n"));
+        lines.push("```");
+      } else if (block.type === "math") {
+        lines.push("$$");
+        lines.push(...block.content.split("\n"));
+        lines.push("$$");
+      } else {
+        lines.push(block.content);
+      }
+    });
+    onContentChange?.(lines.join("\n"));
+  };
+
+  // keyboard navigation and splitting logic
+  const handleKeyDown = (e) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    
+    const val = ta.value;
+    const pos = ta.selectionStart;
+    const currentBlock = blocks[currentIndex];
+    
+    // Handle code fence creation
+    if (
+      e.key === "Enter" &&
+      !e.shiftKey &&
+      currentBlock.type === "line" &&
+      /^\s*```(.*)$/.test(currentBlock.content)
+    ) {
+      e.preventDefault();
+      const lang = (currentBlock.content.match(/^\s*```(.*)$/)[1] || "").trim();
       
-      Markdown,
-      Placeholder.configure({ placeholder: 'Start writing your LaTeX/Markdown here...' }),
-    ],
-    content: initialContent,
-    onCreate({ editor }) {
-      setPreview(editor.getHTML());
-    },
-    onUpdate({ editor }) {
-      setPreview(editor.getHTML());
-    },
-    editorProps: {
-      // Add the MathPlugin to properly process math expressions
-      attributes: {
-        class: 'cotex-editor',
-      },
-    },
-  });
-
-  // Add MathPlugin after editor is created
-  useEffect(() => {
-    if (editor) {
-      editor.registerPlugin(MathPlugin(editor));
+      setBlocks(prev => {
+        const copy = [...prev];
+        // Replace the fence line with a code block structure
+        copy.splice(
+          currentIndex,
+          1,
+          { type: "line", content: `\`\`\`${lang}` },
+          { type: "code", lang, content: "" },
+          { type: "line", content: "```" }
+        );
+        return copy;
+      });
+      
+      // Move to the content block
+      setCurrentIndex(currentIndex + 1);
+      return;
     }
-  }, [editor]);
-
-  // Begin resizing
-  const startResizing = useCallback((e) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  // Handle mouse movements while resizing
-  useEffect(() => {
-    function onMouseMove(e) {
-      if (!isResizing || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const percent = ((e.clientX - rect.left) / rect.width) * 100;
-      setWidth(Math.min(Math.max(percent, 20), 80));
+    
+    // Handle math fence creation
+    if (
+      e.key === "Enter" &&
+      !e.shiftKey &&
+      currentBlock.type === "line" &&
+      /^\s*\$\$(.*)$/.test(currentBlock.content)
+    ) {
+      e.preventDefault();
+      
+      setBlocks(prev => {
+        const copy = [...prev];
+        copy.splice(
+          currentIndex,
+          1,
+          { type: "line", content: "$$" },
+          { type: "math", content: "" },
+          { type: "line", content: "$$" }
+        );
+        return copy;
+      });
+      
+      setCurrentIndex(currentIndex + 1);
+      return;
     }
-    function onMouseUp() {
-      setIsResizing(false);
+    
+    // Shift+Enter to exit a code/math block
+    if (
+      e.key === "Enter" &&
+      e.shiftKey &&
+      (currentBlock.type === "code" || currentBlock.type === "math")
+    ) {
+      e.preventDefault();
+      
+      // Find the closing fence block
+      const closingBlockIndex = currentIndex + 1;
+      
+      // Insert an empty line after the closing fence
+      setBlocks(prev => {
+        const copy = [...prev];
+        copy.splice(closingBlockIndex + 1, 0, { type: "line", content: "" });
+        return copy;
+      });
+      
+      // Move focus to the new empty line
+      setCurrentIndex(closingBlockIndex + 1);
+      return;
+    }
+    
+    // Regular Enter within a code/math block should just insert a newline
+    if (e.key === "Enter" && (currentBlock.type === "code" || currentBlock.type === "math")) {
+      // Let the default behavior happen - textareas handle newlines naturally
+      return;
+    }
+    
+    // ↑: move up if at start
+    if (e.key === "ArrowUp" && pos === 0 && currentIndex > 0) {
+      e.preventDefault();
+      setCurrentIndex((i) => i - 1);
+      return;
     }
 
-    if (isResizing) {
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
+    // ↓: move down if at end
+    if (e.key === "ArrowDown" && pos === val.length && currentIndex < blocks.length - 1) {
+      e.preventDefault();
+      setCurrentIndex((i) => i + 1);
+      return;
     }
-    return () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-  }, [isResizing]);
+
+    // Enter in a normal line: split line into two
+    if (e.key === "Enter" && currentBlock.type === "line") {
+      e.preventDefault();
+      const before = val.slice(0, pos);
+      const after = val.slice(pos);
+      
+      setBlocks((prev) => {
+        const copy = [...prev];
+        // Replace current block with before, insert after as new block
+        copy.splice(currentIndex, 1, 
+          { type: "line", content: before }, 
+          { type: "line", content: after }
+        );
+        return copy;
+      });
+      
+      // Move focus to the newly created line
+      setCurrentIndex((i) => i + 1);
+    }
+  };
+
+  // click on a rendered line to start editing there
+  const handleLineClick = (idx) => {
+    setCurrentIndex(idx);
+  };
 
   return (
-    <div className="flex h-full" ref={containerRef}>
-      {/* Editor Pane */}
-      <div
-        className="overflow-auto rounded-md shadow-lg tiptap-container"
-        style={{ width: `${width}%` }}
-      >
-        {/* Toolbar */}
-        {editor && (
-          <div className="tiptap-toolbar">
-            <button
-              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-              className={editor.isActive('heading', { level: 1 }) ? 'is-active' : ''}
-            >
-              H1
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-              className={editor.isActive('heading', { level: 2 }) ? 'is-active' : ''}
-            >
-              H2
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleBold().run()}
-              className={editor.isActive('bold') ? 'is-active' : ''}
-            >
-              Bold
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-              className={editor.isActive('italic') ? 'is-active' : ''}
-            >
-              Italic
-            </button>
-            <button onClick={() => editor.chain().focus().insertMathBlock().run()}>
-              TeX Block
-            </button>
-            <button onClick={() => editor.chain().focus().insertMathInline().run()}>
-              TeX Inline
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-              className={editor.isActive('codeBlock') ? 'is-active' : ''}
-            >
-              Code Block
-            </button>
-          </div>
-        )}
-
-        {/* Editor Content */}
-        <EditorContent editor={editor} className="tiptap-editor" />
-      </div>
-
-      {/* Resize Handle */}
-      <div
-        className="w-0.5 cursor-col-resize bg-purple-500 hover:bg-purple-300 transition-colors"
-        onMouseDown={startResizing}
-      />
-
-      {/* Live Preview */}
-      <div
-        className="flex-grow p-4 overflow-auto rendered-preview"
-        dangerouslySetInnerHTML={{ __html: preview }}
-      />
+    <div className="editor" style={{ lineHeight: '1.5' }}>
+      {blocks.map((block, bIdx) => {
+        // If this is the currently edited block
+        if (bIdx === currentIndex) {
+          const isCode = block.type === "code";
+          const isMath = block.type === "math";
+          
+          return (
+            <textarea
+              key={bIdx}
+              ref={textareaRef}
+              value={block.content}
+              onChange={(e) => updateBlockContent(bIdx, e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={handleBlur}
+              rows={isCode || isMath ? Math.max(3, block.content.split("\n").length) : 1}
+              style={{
+                width: "100%",
+                fontFamily: isCode || isMath ? "monospace" : "inherit",
+                padding: "4px",
+                border: "1px solid #ddd",
+                borderRadius: "4px",
+                fontSize: block.content.startsWith('#') ? 
+                  headerStyles[`h${block.content.match(/^#+/)[0].length}`]?.fontSize || 'inherit' : 
+                  'inherit',
+              }}
+            />
+          );
+        }
+        
+        // Static renders for non-active blocks
+        if (block.type === "code") {
+          return (
+            <pre key={bIdx} onClick={() => handleLineClick(bIdx)} style={{ cursor: "text" }}>
+              <code>
+                {block.content}
+              </code>
+            </pre>
+          );
+        }
+        
+        if (block.type === "math") {
+          return (
+            <div
+              key={bIdx}
+              className="math-block"
+              onClick={() => handleLineClick(bIdx)}
+              style={{ cursor: "text" }}
+              dangerouslySetInnerHTML={{
+                __html: katex.renderToString(block.content, {
+                  displayMode: true,
+                  throwOnError: false,
+                }),
+              }}
+            />
+          );
+        }
+        
+        // Plain line
+        return (
+          <div
+            key={bIdx}
+            onClick={() => handleLineClick(bIdx)}
+            style={{ 
+              cursor: "text",
+              ...(block.content.startsWith('#') ? 
+                headerStyles[`h${block.content.match(/^#+/)[0].length}`] || {} : 
+                {})
+            }}
+            dangerouslySetInnerHTML={{
+              __html: parseLine(block.content),
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
