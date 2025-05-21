@@ -145,6 +145,19 @@ export default function Editor({ content = "", onContentChange }) {
   const handleKeyDown = (e) => {
     const ta = textareaRef.current;
     if (!ta) return;
+
+    // Tab → insert a tab character
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const pos = ta.selectionStart;
+      const val = ta.value;
+      updateBlockContent(currentIndex, val.slice(0, pos) + "\t" + val.slice(pos));
+      // restore cursor
+      setTimeout(() => {
+        ta.selectionStart = ta.selectionEnd = pos + 1;
+      }, 0);
+      return;
+    }
     
     const val = ta.value;
     const pos = ta.selectionStart;
@@ -273,7 +286,15 @@ export default function Editor({ content = "", onContentChange }) {
   };
 
   return (
-    <div className="editor" style={{ lineHeight: '1.5' }}>
+    <div
+      className="editor"
+      style={{
+        lineHeight: "1.5",
+        width: "100%",
+        height: "100%",
+        overflowY: "auto",
+      }}
+    >
       {blocks.map((block, bIdx) => {
         // If this is the currently edited block
         if (bIdx === currentIndex) {
@@ -299,6 +320,20 @@ export default function Editor({ content = "", onContentChange }) {
                   headerStyles[`h${block.content.match(/^#+/)[0].length}`]?.fontSize || 'inherit' : 
                   'inherit',
               }}
+            />
+          );
+        }
+
+        // NEW: render a blank spacer for an empty line
+        if (block.type === "line" && block.content === "") {
+          return (
+            <div
+              key={bIdx}
+              style={{
+                height: "1em",     // adjust vertical gap here
+                cursor: "text",
+              }}
+              onClick={() => handleLineClick(bIdx)}
             />
           );
         }

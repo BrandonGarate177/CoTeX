@@ -18,12 +18,21 @@ export default function RightSide({content, onContentChange}) {
       <div className="relative z-10 h-full flex flex-col">
         <Topbar />
         
-        {/* Editor container with padding */}
+        {/* Editor container with purple portrait shape */}
         <div className="flex-grow flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl h-3/4 bg-white rounded-lg overflow-hidden shadow-lg">
-            <Editor 
-            content = {content}
-            onContentChange={onContentChange}/>
+          <div
+            className="rounded-lg shadow-lg"
+            style={{
+              width: "66vw",             // about 2/3 of viewport width
+              height: "80vh",            // tall “portrait” shape
+              backgroundColor: "rgba(128,64,128,0.5)", // semi-clear purple
+              overflow: "auto"           // scrollable inner content
+            }}
+          >
+            <Editor
+              content={content}
+              onContentChange={onContentChange}
+            />
           </div>
         </div>
       </div>
