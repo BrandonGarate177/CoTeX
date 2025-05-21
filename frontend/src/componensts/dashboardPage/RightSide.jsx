@@ -4,7 +4,7 @@ import React from "react";
 import Topbar from "./topbar";
 import Editor from "./Editor";
 
-export default function RightSide() {
+export default function RightSide({content, onContentChange}) {
   return (
     <div className="w-full h-full overflow-hidden relative flex flex-col">
       {/* Gradient background */}
@@ -21,7 +21,9 @@ export default function RightSide() {
         {/* Editor container with padding */}
         <div className="flex-grow flex items-center justify-center p-4">
           <div className="w-full max-w-3xl h-3/4 bg-white rounded-lg overflow-hidden shadow-lg">
-            <Editor />
+            <Editor 
+            content = {content}
+            onContentChange={onContentChange}/>
           </div>
         </div>
       </div>
