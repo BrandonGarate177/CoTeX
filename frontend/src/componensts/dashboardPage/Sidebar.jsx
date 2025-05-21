@@ -42,11 +42,53 @@ export default function Sidebar() {
   const [fileModalOpen, setFileModalOpen] = useState(false);
   const [activeProjectId, setActiveProjectId] = useState(null);
 
-  // Fetch user's projects when the component mounts or Projects section is expanded
+  const fetchProjects = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await authAxios.get("/api/projects/");
+      // Either data.results (paginated) or data (unpaginated)
+      const list = Array.isArray(resp.data)
+        ? resp.data
+        : resp.data.results;
+
+      setSections((secs) =>
+        secs.map((sec) =>
+          sec.id === "projects"
+            ? {
+                ...sec,
+                items: list.map((p) => ({
+                  id: p.id,
+                  title: p.name,
+                  expanded: false,
+                  // <-- here we inject the files
+                  items: p.files.map((f) => ({
+                    id: f.id,
+                    title: f.name,
+                    type: "file",
+                  })),
+                })),
+              }
+            : sec
+        )
+      );
+    } catch (e) {
+      console.error(e);
+      setError(e.response?.data?.detail || e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // fetch immediately when the component loads
   useEffect(() => {
-    const projectSection = sections.find(section => section.id === 'projects');
-    
-    if (projectSection && projectSection.expanded && projectSection.items.length === 0) {
+    fetchProjects()
+  }, [])
+
+  // kick off your first load when you expand “Projects”
+  useEffect(() => {
+    const proj = sections.find((s) => s.id === "projects");
+    if (proj?.expanded && proj.items.length === 0) {
       fetchProjects();
     }
   }, [sections]);
@@ -104,11 +146,6 @@ export default function Sidebar() {
     }
   };
   
-  const fetchProjects = async () => {
-    // Keep the existing implementation
-    // ...
-  };
-  
   // Event handlers remain the same
   const handleDragStart = (e, idx) => {
     dragItemIndex.current = idx;
@@ -138,9 +175,17 @@ export default function Sidebar() {
 
   const toggleExpand = (idx) => {
     setSections((old) =>
-      old.map((sec, i) =>
-        i === idx ? { ...sec, expanded: !sec.expanded } : sec
-      )
+      old.map((sec, i) => {
+        if (i === idx) {
+          const expanded = !sec.expanded;
+          // if this is the projects section and we're now opening it…
+          if (sec.id === 'projects' && expanded) {
+            fetchProjects();
+          }
+          return { ...sec, expanded };
+        }
+        return sec;
+      })
     );
   };
 

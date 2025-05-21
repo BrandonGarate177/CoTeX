@@ -19,8 +19,10 @@ export default function RightSide() {
         <Topbar />
         
         {/* Editor container with padding */}
-        <div className="flex-grow overflow-hidden p-4">
-          <Editor />
+        <div className="flex-grow flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl h-3/4 bg-white rounded-lg overflow-hidden shadow-lg">
+            <Editor />
+          </div>
         </div>
       </div>
     </div>

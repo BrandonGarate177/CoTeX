@@ -5,3 +5,4 @@
 /backend/Dockerfile
 /backend/docker-compose.yml
 /backend/DockerDepolyent.txt
+.DS_Store

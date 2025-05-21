@@ -24,6 +24,11 @@ from rest_framework.routers import DefaultRouter
 from apps.projects.views import ProjectViewSet
 from django.conf import settings
 from django.conf.urls.static import static
+from django.urls import path, include
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.http import JsonResponse
+from django.middleware.csrf import get_token
+
 
 
 swagger_permission_classes = [permissions.AllowAny] if settings.DEBUG else [permissions.IsAuthenticated]
@@ -39,8 +44,15 @@ schema_view = get_schema_view(
     permission_classes=(permissions.AllowAny,),
 )
 
+@ensure_csrf_cookie
+def get_csrf(request):
+    # this will set the `csrftoken` cookie on the response
+    return JsonResponse({'detail': 'CSRF cookie set', 'csrf': get_token(request)})
+
+
 urlpatterns = [
 
+    path("api/csrf/", get_csrf),
 
     path('', RedirectView.as_view(url='/swagger/', permanent=False), name='swagger-redirect'),
     path('admin/', admin.site.urls),

@@ -32,7 +32,9 @@ export const refreshAccessToken = async () => {
 
 // Create an axios instance with interceptors
 export const authAxios = axios.create({
-  baseURL: API_URL
+  baseURL: process.env.REACT_APP_API_URL || "http://localhost:8000",
+  withCredentials: true,            // send cookies for CSRF
+  headers: { "Content-Type": "application/json" }
 });
 
 // Add request interceptor
