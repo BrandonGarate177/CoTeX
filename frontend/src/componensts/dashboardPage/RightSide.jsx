@@ -23,10 +23,11 @@ export default function RightSide({content, onContentChange}) {
           <div
             className="rounded-lg shadow-lg"
             style={{
-              width: "66vw",             // about 2/3 of viewport width
-              height: "80vh",            // tall “portrait” shape
-              backgroundColor: "rgba(128,64,128,0.5)", // semi-clear purple
-              overflow: "auto"           // scrollable inner content
+              width: "40vw",             // about 2/3 of viewport width
+              height: "100%",            // tall “portrait” shape
+              backgroundColor: "#290C3B", // semi-clear purple
+              overflow: "auto", 
+              opacity: 0.8               // scrollable inner content
             }}
           >
             <Editor
