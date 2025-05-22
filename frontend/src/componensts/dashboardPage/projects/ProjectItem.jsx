@@ -1,19 +1,18 @@
 import React from 'react';
-import FileItem from './FileItem';
 import FolderItem from './FolderItem';
 
-export default function ProjectItem({ 
-  project, 
-  onToggleProject, 
-  onFileClick, 
+export default function ProjectItem({
+  project,
+  onToggleProject,
   onToggleFolder,
   onAddFile,
-  onAddFolder
+  onAddFolder,
+  onFileClick
 }) {
   return (
     <div className="mb-2">
       {/* Project Entry */}
-      <button
+      <div
         className="flex w-full items-center px-3 py-1 rounded hover:bg-[#27004A]"
         onClick={() => onToggleProject(project.id)}
       >
@@ -49,7 +48,7 @@ export default function ProjectItem({
         >
           {'>'}
         </span>
-      </button>
+      </div>
       
       {/* Files and Folders for this Project */}
       {project.expanded && (
@@ -69,11 +68,13 @@ export default function ProjectItem({
                 );
               } else {
                 return (
-                  <FileItem 
-                    key={item.id} 
-                    file={item} 
-                    onClick={onFileClick} 
-                  />
+                  <div
+                    key={item.id}
+                    className="cursor-pointer hover:underline"
+                    onClick={() => onFileClick(item.id)}
+                  >
+                    {item.title}
+                  </div>
                 );
               }
             })

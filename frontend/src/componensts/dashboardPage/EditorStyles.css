@@ -105,3 +105,115 @@
 .math-block {
   margin: 1em 0;
 }
+.editor-block {
+  position: relative;
+}
+
+.editor-block:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.block-actions {
+  display: none;
+  position: absolute;
+  right: 8px;
+  top: 4px;
+}
+
+.editor-block:hover .block-actions {
+  display: flex;
+}
+
+.action-button {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 14px;
+}
+
+.action-button:hover {
+  color: white;
+}
+.code-block-container, .math-block-container {
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.code-block-container:hover, .math-block-container:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.code-block-header, .math-block-header {
+  transition: background-color 0.2s ease;
+}
+
+.code-block-header:hover, .math-block-header:hover {
+  background-color: #2a2a2a;
+}
+
+.code-block-actions button, .math-block-actions button {
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.code-block-actions button:hover, .math-block-actions button:hover {
+  opacity: 1;
+}
+
+/* Prism overrides to match Obsidian style */
+code[class*="language-"], pre[class*="language-"] {
+  text-shadow: none;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+}
+
+/* Smooth transition for folding */
+.code-block-container > div:nth-child(2) {
+  transition: max-height 0.3s ease;
+}
+
+/* Line number styling */
+.code-line-numbers {
+  font-size: 0.85em;
+  color: #6c6c6c;
+}
+
+/* Active text area styling */
+textarea {
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  line-height: 1.5;
+}
+
+/* Make math rendering match Obsidian's style */
+.katex-display {
+  margin: 0.5em 0;
+}
+
+/* Add these styles for better scrolling */
+.editor {
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 16px; /* Add padding for the scrollbar */
+}
+
+/* Make the editor content wrap properly */
+.editor textarea, 
+.editor pre, 
+.editor code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Ensure code blocks have proper scrolling */
+.code-block-container pre {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* Ensure the math blocks render properly */
+.math-block-container .katex-display {
+  overflow-x: auto;
+  max-width: 100%;
+}

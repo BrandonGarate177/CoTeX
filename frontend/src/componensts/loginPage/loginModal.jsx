@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import {getCookie} from '../../utils/csrf'; // Adjust the import path as necessary
 
 export default function LoginModal({ isOpen, onClose }) {
   const [formData, setFormData] = useState({ username: '', password: '' });
@@ -21,7 +22,8 @@ export default function LoginModal({ isOpen, onClose }) {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken') // Include CSRF token
         },
         credentials: 'include', // Include cookies if your API uses sessions
         body: JSON.stringify(formData)

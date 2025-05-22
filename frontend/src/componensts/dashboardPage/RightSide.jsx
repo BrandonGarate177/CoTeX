@@ -4,7 +4,7 @@ import React from "react";
 import Topbar from "./topbar";
 import Editor from "./Editor";
 
-export default function RightSide() {
+export default function RightSide({content, onContentChange}) {
   return (
     <div className="w-full h-full overflow-hidden relative flex flex-col">
       {/* Gradient background */}
@@ -18,9 +18,23 @@ export default function RightSide() {
       <div className="relative z-10 h-full flex flex-col">
         <Topbar />
         
-        {/* Editor container with padding */}
-        <div className="flex-grow overflow-hidden p-4">
-          <Editor />
+        {/* Editor container with purple portrait shape */}
+        <div className="flex-grow flex items-center justify-center p-4">
+          <div
+            className="rounded-lg shadow-lg"
+            style={{
+              width: "40vw",             // about 2/3 of viewport width
+              height: "100%",            // tall “portrait” shape
+              backgroundColor: "#290C3B", // semi-clear purple
+              overflow: "auto", 
+              opacity: 0.8               // scrollable inner content
+            }}
+          >
+            <Editor
+              content={content}
+              onContentChange={onContentChange}
+            />
+          </div>
         </div>
       </div>
     </div>
