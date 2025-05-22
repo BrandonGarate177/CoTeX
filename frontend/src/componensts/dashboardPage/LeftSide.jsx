@@ -1,5 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { authAxios } from '../../utils/auth';
+import { 
+  FiFolder, 
+  FiFile, 
+  FiChevronRight, 
+  FiPlus, 
+  FiRefreshCw, 
+  FiMoreHorizontal,
+  FiEdit,
+  FiTrash2
+} from 'react-icons/fi';
 
 // Import modals
 import ProjectModal from './sidebarComps/ProjectModal';
@@ -13,21 +23,22 @@ import ProjectItem from './projects/ProjectItem';
 const initialSections = [
   {
     id: 'projects',
-    title: 'Projects',
+    title: 'PROJECTS',
     content: null,
-    expanded: false,
+    expanded: true, // Auto-expand projects by default
     items: []
   },
   {
     id: 'updates',
-    title: 'Updates',
-    content: 'Your updates will appear here',
+    title: 'UPDATES',
+    content: null,
     expanded: false,
+    items: []
   },
 ];
 
 export default function LeftSide({ onFileSelect }) {
-  // State variables remain the same
+  // State variables
   const [folderModalOpen, setFolderModalOpen] = useState(false);
   const [projectFolders, setProjectFolders] = useState({});
   
@@ -41,6 +52,15 @@ export default function LeftSide({ onFileSelect }) {
   const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [fileModalOpen, setFileModalOpen] = useState(false);
   const [activeProjectId, setActiveProjectId] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hoveredSection, setHoveredSection] = useState(null);
+
+  // Mock updates for demonstration
+  const mockUpdates = [
+    { id: 1, type: 'commit', text: 'New commit: Update README.md', date: '2 hours ago' },
+    { id: 2, type: 'note', text: 'Meeting notes: Discuss latex templates', date: 'Yesterday' },
+    { id: 3, type: 'version', text: 'v1.2.0 released', date: '3 days ago' },
+  ];
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -61,7 +81,6 @@ export default function LeftSide({ onFileSelect }) {
                   id: p.id,
                   title: p.name,
                   expanded: false,
-                  // <-- here we inject the files
                   items: p.files.map((f) => ({
                     id: f.id,
                     title: f.name,
@@ -69,7 +88,12 @@ export default function LeftSide({ onFileSelect }) {
                   })),
                 })),
               }
-            : sec
+            : sec.id === "updates" 
+              ? {
+                  ...sec,
+                  items: mockUpdates // Add mock updates
+                }
+              : sec
         )
       );
     } catch (e) {
@@ -82,10 +106,10 @@ export default function LeftSide({ onFileSelect }) {
 
   // fetch immediately when the component loads
   useEffect(() => {
-    fetchProjects()
-  }, [])
+    fetchProjects();
+  }, []);
 
-  // kick off your first load when you expand “Projects”
+  // kick off your first load when you expand "Projects"
   useEffect(() => {
     const proj = sections.find((s) => s.id === "projects");
     if (proj?.expanded && proj.items.length === 0) {
@@ -146,7 +170,7 @@ export default function LeftSide({ onFileSelect }) {
     }
   };
   
-  // Event handlers remain the same
+  // Event handlers
   const handleDragStart = (e, idx) => {
     dragItemIndex.current = idx;
     setDragging(true);
@@ -155,8 +179,8 @@ export default function LeftSide({ onFileSelect }) {
   };
 
   const handleDragOver = (e) => {
-    // Keep the existing implementation
-    // ...
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
   };
 
   const reorderSections = (fromIdx, toIdx) => {
@@ -253,7 +277,7 @@ export default function LeftSide({ onFileSelect }) {
     return response.data;
   };
   
-  // Add these new handler functions to pass to ProjectItem
+  // Handler functions for ProjectItem
   const handleAddFile = (projectId) => {
     setActiveProjectId(projectId);
     setFileModalOpen(true);
@@ -264,18 +288,96 @@ export default function LeftSide({ onFileSelect }) {
     setFolderModalOpen(true);
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchProjects();
+    setTimeout(() => setRefreshing(false), 500); // Show spinner for at least 500ms
+  };
+
+  // Function to render update items
+  const renderUpdateItem = (item) => {
+    let bgColor = 'bg-purple-800/30';
+    let icon = null;
+    
+    if (item.type === 'commit') {
+      icon = <span className="text-green-400">●</span>;
+    } else if (item.type === 'note') {
+      icon = <span className="text-yellow-400">●</span>;
+    } else if (item.type === 'version') {
+      icon = <span className="text-blue-400">●</span>;
+    }
+    
+    return (
+      <div key={item.id} className={`p-2 mb-2 rounded ${bgColor} hover:bg-purple-800/50 transition-colors`}>
+        <div className="flex items-center gap-2 mb-1">
+          {icon}
+          <span className="text-sm font-medium">{item.text}</span>
+        </div>
+        <div className="text-xs text-gray-400">{item.date}</div>
+      </div>
+    );
+  };
+
+  // VS Code-style section header with actions
+  const renderSectionHeader = (sec, idx) => {
+    return (
+      <div 
+        className="flex w-full items-center px-4 py-2 hover:bg-[#27004A] cursor-pointer border-b border-[#37155F] group"
+        onMouseEnter={() => setHoveredSection(sec.id)}
+        onMouseLeave={() => setHoveredSection(null)}
+      >
+        <button
+          className="flex flex-1 items-center outline-none"
+          onClick={() => toggleExpand(idx)}
+        >
+          <FiChevronRight
+            className={`transform transition-transform duration-200 mr-1 text-gray-400 ${
+              sec.expanded ? 'rotate-90' : ''
+            }`}
+            size={14}
+          />
+          <span className="text-xs font-medium text-left tracking-wider text-gray-400 flex-1">
+            {sec.title}
+          </span>
+        </button>
+
+        {/* VS Code-style action buttons */}
+        {sec.id === 'projects' && (
+          <div className={`flex items-center space-x-1 ${!hoveredSection || hoveredSection !== sec.id ? 'opacity-0' : 'opacity-100'} transition-opacity`}>
+            <button 
+              className="p-1 rounded hover:bg-[#37155F] text-gray-400 hover:text-white transition-colors"
+              onClick={() => setProjectModalOpen(true)}
+              title="New Project"
+            >
+              <FiPlus size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="flex flex-col h-screen w-[290px] bg-[#230B38] text-[#F7EBFD] font-['Source_Code_Pro']">
+    <div className="flex flex-col h-screen w-[290px] bg-[#230B38] text-[#F7EBFD] font-['Source_Code_Pro'] border-r border-[#37155F]">
       {/* Header with Logo/Title */}
-      <div className="px-4 py-4 text-2xl font-semibold">CoTeX</div>
+      <div className="px-4 py-3 text-xl font-semibold border-b border-[#37155F] flex justify-between items-center">
+        <span>CoTeX</span>
+        <button 
+          onClick={handleRefresh}
+          className="p-1 rounded-full hover:bg-[#37155F] transition-colors"
+          title="Refresh"
+        >
+          <FiRefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
 
       {/* Sections */}
       <div
-        className="flex-1 overflow-auto p-2"
+        className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-[#37155F] scrollbar-track-[#230B38]"
         onDragOver={handleDragOver}
       >
         {/* Sections Container */}
-        <div className="flex flex-col gap-y-4">
+        <div className="flex flex-col">
           {sections.map((sec, idx) => (
             <div
               key={sec.id}
@@ -287,60 +389,53 @@ export default function LeftSide({ onFileSelect }) {
                 dragging && dragItemIndex.current === idx ? 'opacity-50' : ''
               }`}
             >
-              <button
-                className="flex w-full items-center px-3 py-2 rounded hover:bg-[#27004A] cursor-move"
-                onClick={() => toggleExpand(idx)}
-              >
-                <span className="flex-1 text-lg text-left">
-                  {sec.title}
-                  {sec.id === 'projects' && (
-                    <button 
-                      className="ml-2 px-2 text-sm bg-[#27004A] rounded-full hover:bg-purple-800 inline-flex items-center justify-center"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setProjectModalOpen(true);
-                      }}
-                    >
-                      +
-                    </button>
-                  )}
-                </span>
-                <span
-                  className={`text-2xl transform transition-transform duration-200 ${
-                    sec.expanded ? 'rotate-90' : ''
-                  }`}
-                >
-                  {'>'}
-                </span>
-              </button>
+              {/* VS Code-style header */}
+              {renderSectionHeader(sec, idx)}
 
               {sec.expanded && (
-                <div className="ml-2 mt-1">
+                <div className="overflow-hidden">
                   {sec.id === 'projects' ? (
-                    <>
-                      {loading && <div className="text-sm text-gray-300 p-2">Loading projects...</div>}
-                      {error && <div className="text-sm text-red-400 p-2">{error}</div>}
+                    <div className="bg-[#27004A]/40">
+                      {loading && <div className="text-sm text-gray-300 p-4">Loading projects...</div>}
+                      {error && <div className="text-sm text-red-400 p-4">{error}</div>}
                       
                       {sec.items.length === 0 && !loading && !error && (
-                        <div className="text-sm text-gray-300 p-2">No projects found. Create one to get started!</div>
+                        <div className="flex flex-col items-center justify-center p-6 text-center">
+                          <div className="text-sm text-gray-300 mb-3">
+                            No projects found
+                          </div>
+                          <button 
+                            className="px-3 py-1.5 bg-[#37155F] hover:bg-[#4B2077] text-white rounded-md text-sm flex items-center transition-colors"
+                            onClick={() => setProjectModalOpen(true)}
+                          >
+                            <FiPlus className="mr-1.5" size={14} />
+                            New Project
+                          </button>
+                        </div>
                       )}
                       
-                      {/* Use ProjectItem component here */}
-                      {sec.items.map(project => (
-                        <ProjectItem 
-                          key={project.id}
-                          project={project}
-                          onToggleProject={toggleProjectExpand}
-                          onFileClick={handleFileClick}
-                          onToggleFolder={toggleFolderExpand}
-                          onAddFile={handleAddFile}
-                          onAddFolder={handleAddFolder}
-                        />
-                      ))}
-                    </>
+                      {/* Projects List */}
+                      <div className="py-1">
+                        {sec.items.map(project => (
+                          <ProjectItem 
+                            key={project.id}
+                            project={project}
+                            onToggleProject={toggleProjectExpand}
+                            onFileClick={handleFileClick}
+                            onToggleFolder={toggleFolderExpand}
+                            onAddFile={handleAddFile}
+                            onAddFolder={handleAddFolder}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   ) : (
-                    <div className="bg-[#27004A] rounded px-3 py-2">
-                      <p className="text-sm text-gray-300">{sec.content}</p>
+                    <div className="bg-[#27004A]/40 p-3">
+                      {sec.items && sec.items.length > 0 ? (
+                        sec.items.map(item => renderUpdateItem(item))
+                      ) : (
+                        <p className="text-sm text-gray-300 p-2">No recent updates</p>
+                      )}
                     </div>
                   )}
                 </div>

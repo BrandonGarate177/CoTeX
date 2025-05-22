@@ -1,84 +1,115 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { FiFolder, FiFile, FiChevronRight, FiPlus } from 'react-icons/fi';
 import FolderItem from './FolderItem';
 
-export default function ProjectItem({
-  project,
-  onToggleProject,
+export default function ProjectItem({ 
+  project, 
+  onToggleProject, 
+  onFileClick, 
   onToggleFolder,
   onAddFile,
-  onAddFolder,
-  onFileClick
+  onAddFolder
 }) {
+  const [hovered, setHovered] = useState(false);
+  
   return (
-    <div className="mb-2">
-      {/* Project Entry */}
-      <div
-        className="flex w-full items-center px-3 py-1 rounded hover:bg-[#27004A]"
-        onClick={() => onToggleProject(project.id)}
+    <div className="flex flex-col">
+      {/* Project header */}
+      <div 
+        className="flex items-center pl-4 pr-2 py-1.5 hover:bg-[#37155F]/70 cursor-pointer relative"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
-        <span className="flex-1 text-left">{project.title}
-          {/* Add buttons for file and folder creation */}
-          <div className="inline-flex ml-2">
-            <button 
-              className="px-1.5 text-xs bg-[#27004A] rounded-full hover:bg-purple-800 inline-flex items-center justify-center mr-1"
-              title="Add new file"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddFile(project.projectId);
-              }}
-            >
-              <span>+F</span>
-            </button>
-            <button 
-              className="px-1.5 text-xs bg-[#27004A] rounded-full hover:bg-purple-800 inline-flex items-center justify-center"
-              title="Add new folder"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddFolder(project.projectId);
-              }}
-            >
-              <span>+D</span>
-            </button>
-          </div>
-        </span>
-        <span
-          className={`text-xl transform transition-transform duration-200 ${
-            project.expanded ? 'rotate-90' : ''
-          }`}
+        <button
+          className="flex-1 flex items-center outline-none"
+          onClick={() => onToggleProject(project.id)}
         >
-          {'>'}
-        </span>
+          <FiChevronRight
+            className={`transform transition-transform duration-200 mr-1 ${
+              project.expanded ? 'rotate-90' : ''
+            }`}
+            size={14}
+          />
+          <FiFolder className="mr-2 text-yellow-300" size={16} />
+          <span className="text-sm">{project.title}</span>
+        </button>
+        
+        {/* VS Code-style action buttons - always rendered but with opacity transition */}
+        <div className={`flex items-center space-x-0.5 absolute right-2 transition-opacity ${hovered ? 'opacity-100' : 'opacity-0'}`}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddFile(project.id);
+            }}
+            className="p-1 rounded hover:bg-purple-800/70 transition-colors"
+            title="New File"
+          >
+            <FiFile size={14} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddFolder(project.id);
+            }}
+            className="p-1 rounded hover:bg-purple-800/70 transition-colors"
+            title="New Folder"
+          >
+            <FiFolder size={14} />
+          </button>
+        </div>
       </div>
       
-      {/* Files and Folders for this Project */}
+      {/* Files and folders list */}
       {project.expanded && (
-        <div className="ml-4 mt-1">
-          {project.items.length === 0 ? (
-            <div className="text-sm text-gray-300 px-3 py-1">No files or folders in this project</div>
-          ) : (
-            project.items.map(item => {
-              if (item.type === 'folder') {
-                return (
-                  <FolderItem 
-                    key={item.id}
-                    folder={item}
-                    onToggle={onToggleFolder}
-                    onFileClick={onFileClick}
-                  />
-                );
-              } else {
-                return (
-                  <div
-                    key={item.id}
-                    className="cursor-pointer hover:underline"
-                    onClick={() => onFileClick(item.id)}
+        <div className="ml-4">
+          {project.items.map(item => {
+            if (item.type === 'folder') {
+              return (
+                <div key={item.id} className="flex flex-col">
+                  <div 
+                    className="flex items-center pl-4 pr-2 py-1.5 hover:bg-[#37155F]/70 cursor-pointer"
+                    onClick={() => onToggleFolder(item.id)}
                   >
-                    {item.title}
+                    <FiChevronRight
+                      className={`transform transition-transform duration-200 mr-1 ${
+                        item.expanded ? 'rotate-90' : ''
+                      }`}
+                      size={14}
+                    />
+                    <FiFolder className="mr-2 text-yellow-300" size={16} />
+                    <span className="text-sm">{item.title}</span>
                   </div>
-                );
-              }
-            })
-          )}
+                  
+                  {item.expanded && item.items && (
+                    <div className="ml-4">
+                      {item.items.map(file => (
+                        <div 
+                          key={file.id}
+                          className="flex items-center pl-6 pr-2 py-1.5 hover:bg-[#37155F]/70 cursor-pointer"
+                          onClick={() => onFileClick(file.id)}
+                        >
+                          <FiFile className="mr-2 text-gray-300" size={16} />
+                          <span className="text-sm">{file.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            } else {
+              // File item
+              return (
+                <div 
+                  key={item.id}
+                  className="flex items-center pl-6 pr-2 py-1.5 hover:bg-[#37155F]/70 cursor-pointer"
+                  onClick={() => onFileClick(item.id)}
+                >
+                  <FiFile className="mr-2 text-gray-300" size={16} />
+                  <span className="text-sm">{item.title}</span>
+                </div>
+              );
+            }
+          })}
         </div>
       )}
     </div>
