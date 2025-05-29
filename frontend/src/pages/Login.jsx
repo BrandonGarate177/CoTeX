@@ -1,6 +1,6 @@
 import React from 'react';
-import LeftSide from '../componensts/loginPage/LeftSide';
-import RightSide from '../componensts/loginPage/RightSide';
+import LeftSide from '../components/loginPage/LeftSide';
+import RightSide from '../components/loginPage/RightSide';
 
 export default function Login() {
   return (

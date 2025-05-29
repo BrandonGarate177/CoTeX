@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { authAxios } from "../utils/auth";
-import LeftSide from "../componensts/dashboardPage/LeftSide";
-import RightSide from "../componensts/dashboardPage/RightSide";
+import LeftSide from "../components/dashboardPage/LeftSide";
+import RightSide from "../components/dashboardPage/RightSide";
 
 export default function Dashboard() {
   const [selectedFileId, setSelectedFileId] = useState(null);

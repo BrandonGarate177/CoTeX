@@ -384,3 +384,31 @@ textarea {
 .editor::-webkit-scrollbar-thumb:hover {
   background-color: rgba(255, 255, 255, 0.3);
 }
+
+
+/* WYSIWYG Code Editor */
+.code-editor-container {
+  position: relative;
+  font-family: 'Fira Code', monospace;
+}
+
+.code-editor-container textarea,
+.code-editor-container pre {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Ensure proper tab size */
+.code-editor-container pre code {
+  tab-size: 2;
+}
+
+/* Make sure line breaks and whitespace are preserved exactly the same way in both elements */
+.code-editor-container textarea,
+.code-editor-container pre code {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  box-sizing: border-box;
+}
+

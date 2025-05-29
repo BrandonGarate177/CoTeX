@@ -2,10 +2,14 @@
 
 import React from "react";
 import Topbar from "./topbar";
-import Editor from "./Editor";
-import EditorToolbar from "./EditorToolbar";
+import Editor from "../../components/editor/Editor";
+import EditorToolbar from "../../components/editor/EditorToolbar";
+
+
+// get the height and width of the window 
 
 export default function RightSide({content, onContentChange}) {
+
   return (
     <div className="w-full h-full overflow-hidden relative flex flex-col">
       {/* Gradient background */}
@@ -24,17 +28,16 @@ export default function RightSide({content, onContentChange}) {
           <div
             className="rounded-lg shadow-lg flex flex-col"
             style={{
-              width: "40vw",             // about 2/3 of viewport width
-              height: "100%",            // tall "portrait" shape
-              backgroundColor: "#290C3B", // semi-clear purple
-              overflow: "hidden",        // ensure we contain scrolling within the editor
-              opacity: 0.8               // semi-transparent
+              width: "70vw",             
+              height: "85vh",
+              position:"absolute",
+              backgroundColor: "#290C3B", 
+              overflow: "hidden",        
+              opacity: 0.8               
             }}
           >
-            {/* Add the toolbar at the top of the editor container */}
             <EditorToolbar />
             
-            {/* Editor with flex-grow takes remaining height and enables scrolling */}
             <div className="flex-grow relative overflow-auto">
               <Editor
                 content={content}
