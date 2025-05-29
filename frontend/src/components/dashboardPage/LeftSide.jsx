@@ -360,7 +360,7 @@ export default function LeftSide({ onFileSelect }) {
   return (
     <div className="flex flex-col h-screen w-[290px] bg-[#230B38] text-[#F7EBFD] font-['Source_Code_Pro'] border-r border-[#37155F]">
       {/* Header with Logo/Title */}
-      <div className="px-4 py-3 text-xl font-semibold border-b border-[#37155F] flex justify-between items-center">
+      <div className="h-[42px] px-4 py-3 text-xl font-semibold border-b border-[#37155F] flex justify-between items-center">
         <span>CoTeX</span>
         <button 
           onClick={handleRefresh}

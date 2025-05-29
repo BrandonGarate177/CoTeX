@@ -123,6 +123,7 @@ export default function CodeBlockEditor({
         marginBottom: '8px',
         marginTop: '8px',
         border: '1px solid #444',
+        opacity: isFolded ? 0.7 : 1,
         backgroundColor: searchHighlight ? 'rgba(255, 204, 0, 0.1)' : 'transparent'
       }}
     >

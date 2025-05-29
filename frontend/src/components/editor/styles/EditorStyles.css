@@ -412,3 +412,20 @@ textarea {
   box-sizing: border-box;
 }
 
+.selected-block {
+  background-color: rgba(255, 204, 0, 0.2);
+}
+
+/* Styles for text selection */
+.text-selecting ::selection {
+  background-color: rgba(135, 97, 226, 0.4);
+  color: white;
+}
+
+.selected-block textarea {
+  background-color: rgba(255, 204, 0, 0.2);
+}
+
+.text-selected {
+  background-color: rgba(135, 97, 226, 0.4);
+}

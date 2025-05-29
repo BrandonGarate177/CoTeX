@@ -29,6 +29,15 @@ import KeyboardShortcuts from './components/KeyboardShortcuts';
 export default function Editor({ content = "", onContentChange }) {
   const [blocks, setBlocks] = useState(() => toBlocks(content.split("\n")));
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [multiSelectRange, setMultiSelectRange] = useState(null);
+  const [selectionState, setSelectionState] = useState({
+    isSelecting: false,
+    startBlock: null,
+    startOffset: 0,
+    endBlock: null,
+    endOffset: 0
+  });
+  // { start: number, end: number } or null
   const textareaRef = useRef(null);
   const editorRef = useRef(null);
   const blockEditableTypes = ["line", "code", "math"];
@@ -363,8 +372,19 @@ export default function Editor({ content = "", onContentChange }) {
         setCurrentIndex(currentIndex + 1);
         return;
       }
-    }
-    
+      if (e.key === 'ArrowDown' && pos === val.length) {
+      e.preventDefault();
+      if (currentIndex < blocks.length - 1) {
+        setCurrentIndex(i => i + 1);
+      } else {
+        // we were on the *last* block — create a new blank one
+        insertBlockAfter(currentIndex);
+      }
+      return;
+}
+
+  }
+
     // Handle code fence creation
     if (
       e.key === "Enter" &&
@@ -552,19 +572,159 @@ export default function Editor({ content = "", onContentChange }) {
   };
 
   // click on a rendered line to start editing there
-  const handleLineClick = (id) => {
-    const index = blocks.findIndex(block => block.id === id);
-    setCurrentIndex(index);
+  const handleLineClick = (id, e) => {
+    const idx = blocks.findIndex(block => block.id === id);
+
+    if (e.shiftKey && multiSelectRange) {
+      // extend or shrink existing range
+      setMultiSelectRange({
+        start: multiSelectRange.start,
+        end: idx
+      });
+      return;
+    }
+
+    // starting a new shift-click selection?
+    if (e.shiftKey && !multiSelectRange) {
+      setMultiSelectRange({ start: currentIndex, end: idx });
+      return;
+    }
+
+    // normal click — clear any multi-select
+    setMultiSelectRange(null);
+    
+    setCurrentIndex(idx);
+  };
+
+  // Add global key handler for multi-select actions
+  const handleGlobalKeyDown = (e) => {
+    // if we have a multiSelectRange and user hits "Delete" or "Backspace"
+    if ((e.key === 'Delete' || e.key === 'Backspace') && multiSelectRange) {
+      e.preventDefault();
+
+      // compute sorted bounds
+      const start = Math.min(multiSelectRange.start, multiSelectRange.end);
+      const end = Math.max(multiSelectRange.start, multiSelectRange.end);
+
+      // If we have a partial-block selection
+      if (selectionState.startOffset > 0 || selectionState.endOffset < blocks[end].content.length) {
+        // Handle partial block deletion
+        const updatedBlocks = [...blocks];
+        
+        // Handle first block - keep content before selection start
+        if (selectionState.startOffset > 0) {
+          updatedBlocks[start] = {
+            ...updatedBlocks[start],
+            content: updatedBlocks[start].content.substring(0, selectionState.startOffset)
+          };
+        }
+        
+        // Handle last block if different - keep content after selection end
+        if (start !== end && selectionState.endOffset < blocks[end].content.length) {
+          updatedBlocks[end] = {
+            ...updatedBlocks[end],
+            content: updatedBlocks[end].content.substring(selectionState.endOffset)
+          };
+          
+          // Remove intermediate blocks
+          updatedBlocks.splice(start + 1, end - start - 1);
+        } else {
+          // Remove all blocks in the range except the first one
+          updatedBlocks.splice(start + 1, end - start);
+        }
+        
+        setBlocks(updatedBlocks);
+      } else {
+        // Full block deletion
+        setBlocks(prev => {
+          const copy = prev.slice();
+          copy.splice(start, end - start + 1);
+          return copy.length ? copy : [{ id: nanoid(), type: 'line', content: '' }];
+        });
+      }
+
+      setCurrentIndex(start > 0 ? start : 0);
+      setMultiSelectRange(null);
+      return;
+    }
+
+    // Select All shortcut (Ctrl+A / Cmd+A)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      e.preventDefault();
+      // grab the entire range
+      setMultiSelectRange({ start: 0, end: blocks.length - 1 });
+      return;
+    }
+
+    // Clear All shortcut (Ctrl+Shift+Backspace / Cmd+Shift+Backspace)
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Backspace') {
+      e.preventDefault();
+      setBlocks([{ id: nanoid(), type: 'line', content: '' }]);
+      setCurrentIndex(0);
+      setMultiSelectRange(null);
+      return;
+    }
+  };
+
+  // Add these functions to handle text selection
+
+  const handleMouseDown = (blockId, e) => {
+    if (e.target.tagName === 'TEXTAREA') {
+      // Let textarea handle its own selection
+      const blockIndex = blocks.findIndex(block => block.id === blockId);
+      
+      setSelectionState({
+        isSelecting: true,
+        startBlock: blockIndex,
+        startOffset: e.target.selectionStart,
+        endBlock: blockIndex,
+        endOffset: e.target.selectionStart
+      });
+    }
+  };
+
+  const handleMouseMove = (blockId, e) => {
+    if (selectionState.isSelecting && e.target.tagName === 'TEXTAREA') {
+      const blockIndex = blocks.findIndex(block => block.id === blockId);
+      
+      setSelectionState(prev => ({
+        ...prev,
+        endBlock: blockIndex,
+        endOffset: e.target.selectionEnd
+      }));
+    }
+  };
+
+  const handleMouseUp = (e) => {
+    if (selectionState.isSelecting) {
+      // If we have a valid selection across blocks
+      if (selectionState.startBlock !== selectionState.endBlock) {
+        // Set the multiSelectRange to highlight these blocks
+        setMultiSelectRange({
+          start: selectionState.startBlock,
+          end: selectionState.endBlock
+        });
+      }
+      
+      // End selection process
+      setSelectionState(prev => ({
+        ...prev,
+        isSelecting: false
+      }));
+    }
   };
 
   return (
-    <div style={{ 
-      position: 'relative', 
-      width: '100%', 
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
+    <div 
+      style={{ 
+        position: 'relative', 
+        width: '100%', 
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+      onMouseUp={handleMouseUp}
+    >
       {/* Search bar - Obsidian style */}
       {showSearch && (
         <SearchBar
@@ -582,11 +742,13 @@ export default function Editor({ content = "", onContentChange }) {
       <div
         ref={editorRef}
         className="editor obsidian-style"
+        tabIndex={0}
+        onKeyDown={handleGlobalKeyDown}
         style={{
           lineHeight: "1.5",
           width: "100%",
           height: "100%",
-          overflowY: "auto",  // Important: allows scrolling
+          overflowY: "auto",
           overflowX: "hidden",
           color: "#fff",
           padding: "0 16px",
@@ -599,6 +761,15 @@ export default function Editor({ content = "", onContentChange }) {
           const { id, type, content, lang } = block;
           const isActiveBlock = blockIndex === currentIndex;
           const searchHighlight = blockIndex === searchResults[currentSearchIndex];
+          
+          // Check if block is in multi-select range
+          const isInRange =
+            multiSelectRange &&
+            blockIndex >= Math.min(multiSelectRange.start, multiSelectRange.end) &&
+            blockIndex <= Math.max(multiSelectRange.start, multiSelectRange.end);
+            
+          // Determine extra className for selected blocks
+          const extraClassName = isInRange ? 'selected-block' : '';
 
           if (type === "code") {
             return (
@@ -611,7 +782,8 @@ export default function Editor({ content = "", onContentChange }) {
                 blockIndex={blockIndex}
                 commonLanguages={commonLanguages}
                 searchHighlight={searchHighlight}
-                handleLineClick={handleLineClick}
+                extraClassName={extraClassName}
+                handleLineClick={(e) => handleLineClick(id, e)}
                 updateBlockContent={updateBlockContent}
                 updateBlockLanguage={updateBlockLanguage}
                 toggleFold={toggleFold}
@@ -620,6 +792,8 @@ export default function Editor({ content = "", onContentChange }) {
                 handleBlur={handleBlur}
                 adjustTextareaHeight={adjustTextareaHeight}
                 textareaRef={isActiveBlock ? textareaRef : null}
+                onMouseDown={(e) => handleMouseDown(id, e)}
+                onMouseMove={(e) => handleMouseMove(id, e)}
               />
             );
           }
@@ -633,7 +807,8 @@ export default function Editor({ content = "", onContentChange }) {
                 isActive={isActiveBlock}
                 blockIndex={blockIndex}
                 searchHighlight={searchHighlight}
-                handleLineClick={handleLineClick}
+                extraClassName={extraClassName}
+                handleLineClick={(e) => handleLineClick(id, e)}
                 updateBlockContent={updateBlockContent}
                 toggleFold={toggleFold}
                 foldedBlocks={foldedBlocks}
@@ -654,8 +829,9 @@ export default function Editor({ content = "", onContentChange }) {
               isActive={isActiveBlock}
               blockIndex={blockIndex}
               searchHighlight={searchHighlight}
+              extraClassName={extraClassName}
               headerStyles={headerStyles}
-              handleLineClick={handleLineClick}
+              handleLineClick={(e) => handleLineClick(id, e)}
               updateBlockContent={updateBlockContent}
               toggleTaskListItem={toggleTaskListItem}
               insertBlockAfter={insertBlockAfter}
@@ -666,9 +842,30 @@ export default function Editor({ content = "", onContentChange }) {
               adjustTextareaHeight={adjustTextareaHeight}
               textareaRef={isActiveBlock ? textareaRef : null}
               parseLine={parseLine}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
             />
           );
         })}
+
+
+
+        <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+          <button
+            onClick={() => insertBlockAfter(blocks.length - 1)}
+            style={{
+              background: 'none',
+              border: '1px solid #666',
+              borderRadius: '4px',
+              color: '#ccc',
+              padding: '0.5rem 1rem',
+              cursor: 'pointer'
+            }}
+          >
+            + Add empty line
+          </button>
+        </div>
       </div>
       
       <KeyboardShortcuts />
