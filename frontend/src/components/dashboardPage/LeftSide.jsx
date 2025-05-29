@@ -66,36 +66,67 @@ export default function LeftSide({ onFileSelect }) {
     setLoading(true);
     setError(null);
     try {
+      // With the modified API, we only need one call
       const resp = await authAxios.get("/api/projects/");
+      
       // Either data.results (paginated) or data (unpaginated)
       const list = Array.isArray(resp.data)
         ? resp.data
         : resp.data.results;
 
+      // Build the project folders mapping
+      const folderMapping = {};
+      list.forEach(project => {
+        if (project.folders && project.folders.length > 0) {
+          folderMapping[project.id] = project.folders;
+        }
+      });
+      
+      // Update the projectFolders state
+      setProjectFolders(folderMapping);
+
       setSections((secs) =>
-        secs.map((sec) =>
-          sec.id === "projects"
-            ? {
-                ...sec,
-                items: list.map((p) => ({
+        secs.map((sec) => {
+          if (sec.id === "projects") {
+            return {
+              ...sec,
+              items: list.map((p) => {
+                return {
                   id: p.id,
                   title: p.name,
                   expanded: false,
-                  items: p.files.map((f) => ({
-                    id: f.id,
-                    title: f.name,
-                    type: "file",
-                  })),
-                })),
-              }
-            : sec.id === "updates" 
-              ? {
-                  ...sec,
-                  items: mockUpdates // Add mock updates
-                }
-              : sec
-        )
+                  items: [
+                    // Include all folders from the API response
+                    ...(p.folders || []).map(folder => ({
+                      id: folder.id,
+                      title: folder.name,
+                      type: "folder",
+                      expanded: false,
+                      items: [] // Empty folder items array - could contain files if API provides that relationship
+                    })),
+                    
+                    // Include all files
+                    ...(p.files || []).map(f => ({
+                      id: f.id,
+                      title: f.name,
+                      type: "file"
+                    }))
+                  ]
+                };
+              }),
+            };
+          } else if (sec.id === "updates") {
+            return {
+              ...sec,
+              items: mockUpdates
+            };
+          } else {
+            return sec;
+          }
+        })
       );
+      
+      // No need to call fetchFolders separately
     } catch (e) {
       console.error(e);
       setError(e.response?.data?.detail || e.message);
@@ -118,12 +149,19 @@ export default function LeftSide({ onFileSelect }) {
   }, [sections]);
 
   // API functions remain the same
-  const createFolder = async (projectId, folderName) => {
+  const createFolder = async (projectId, folderName, parentFolderId = null) => {
     try {
-      const response = await authAxios.post('/api/files/folders/', {
+      const folderData = {
         name: folderName,
         project: projectId
-      });
+      };
+      
+      // If parent folder ID is provided, include it in the request
+      if (parentFolderId) {
+        folderData.parent = parentFolderId;
+      }
+      
+      const response = await authAxios.post('/api/files/folders/', folderData);
       
       await fetchProjects();
       
@@ -170,6 +208,28 @@ export default function LeftSide({ onFileSelect }) {
     }
   };
   
+  // Add this new function to handle moving files between folders
+  const moveFile = async (fileId, targetFolderId, sourceProjectId, targetProjectId) => {
+    try {
+      // Make an API call to update the file's folder
+      const response = await authAxios.patch(`/api/files/files/${fileId}/`, {
+        folder: targetFolderId
+      });
+      
+      // Refresh projects to update the UI
+      await fetchProjects();
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error moving file:', error);
+      throw new Error(
+        error.response?.data?.detail || 
+        error.message || 
+        'Failed to move file'
+      );
+    }
+  };
+
   // Event handlers
   const handleDragStart = (e, idx) => {
     dragItemIndex.current = idx;
@@ -425,6 +485,7 @@ export default function LeftSide({ onFileSelect }) {
                             onToggleFolder={toggleFolderExpand}
                             onAddFile={handleAddFile}
                             onAddFolder={handleAddFolder}
+                            onMoveFile={moveFile}
                           />
                         ))}
                       </div>
@@ -455,7 +516,10 @@ export default function LeftSide({ onFileSelect }) {
       <FolderModal 
         isOpen={folderModalOpen}
         onClose={() => setFolderModalOpen(false)}
-        onSubmit={createFolder}
+        onSubmit={{
+          ...createFolder,
+          createFile: createFile
+        }}
         projectId={activeProjectId}
       />
       

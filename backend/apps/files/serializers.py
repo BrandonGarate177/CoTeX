@@ -26,6 +26,7 @@ class GitFileSerializer(serializers.ModelSerializer):
 
 
 class FolderSerializer(serializers.ModelSerializer):
+    files = FileSerializer(many=True, read_only=True)
     class Meta:
         model = Folder
-        fields = ['name', 'parent', 'project', 'created_at', 'updated_at', 'file_count']
+        fields = ['id','name', 'parent', 'project', 'files','created_at', 'updated_at', 'file_count']

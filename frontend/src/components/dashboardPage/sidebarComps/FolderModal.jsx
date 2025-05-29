@@ -2,6 +2,9 @@ import React, { useState } from "react";
 
 export default function FolderModal({ isOpen, onClose, onSubmit, projectId }) {
   const [folderName, setFolderName] = useState('');
+  const [createFile, setCreateFile] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [isMainFile, setIsMainFile] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -13,8 +16,22 @@ export default function FolderModal({ isOpen, onClose, onSubmit, projectId }) {
     setError(null);
     
     try {
-      await onSubmit(projectId, folderName);
+      // Create folder first
+      const folder = await onSubmit(projectId, folderName);
+      
+      // If user wants to create a file as well
+      if (createFile && fileName.trim()) {
+        // We'll need to pass the folder creation callback and file creation callback
+        if (typeof onSubmit.createFile === 'function') {
+          await onSubmit.createFile(projectId, fileName, isMainFile, folder.id);
+        }
+      }
+      
+      // Reset form
       setFolderName('');
+      setCreateFile(false);
+      setFileName('');
+      setIsMainFile(false);
       onClose();
     } catch (err) {
       setError(err.message || 'Failed to create folder');
@@ -41,6 +58,45 @@ export default function FolderModal({ isOpen, onClose, onSubmit, projectId }) {
               autoFocus
             />
           </div>
+          
+          <div className="mb-4">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={createFile}
+                onChange={(e) => setCreateFile(e.target.checked)}
+                className="mr-2"
+              />
+              Create file in this folder
+            </label>
+          </div>
+
+          {createFile && (
+            <>
+              <div className="mb-4">
+                <label className="block mb-2">File Name</label>
+                <input
+                  type="text"
+                  value={fileName}
+                  onChange={(e) => setFileName(e.target.value)}
+                  className="w-full p-2 bg-[#27004A] rounded text-[#F7EBFD] focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  placeholder="Enter file name (e.g. main.tex)"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={isMainFile}
+                    onChange={(e) => setIsMainFile(e.target.checked)}
+                    className="mr-2"
+                  />
+                  Set as main file
+                </label>
+              </div>
+            </>
+          )}
           
           {error && <p className="text-red-400 mb-4">{error}</p>}
           
