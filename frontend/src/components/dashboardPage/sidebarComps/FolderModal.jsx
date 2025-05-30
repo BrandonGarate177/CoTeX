@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-export default function FolderModal({ isOpen, onClose, onSubmit, projectId }) {
+export default function FolderModal({ isOpen, onClose, onSubmit, projectId, onCreateFile }) {
   const [folderName, setFolderName] = useState('');
   const [createFile, setCreateFile] = useState(false);
   const [fileName, setFileName] = useState('');
@@ -20,10 +20,15 @@ export default function FolderModal({ isOpen, onClose, onSubmit, projectId }) {
       const folder = await onSubmit(projectId, folderName);
       
       // If user wants to create a file as well
-      if (createFile && fileName.trim()) {
-        // We'll need to pass the folder creation callback and file creation callback
-        if (typeof onSubmit.createFile === 'function') {
-          await onSubmit.createFile(projectId, fileName, isMainFile, folder.id);
+      if (createFile && fileName.trim() && folder?.id) {
+        // Use the dedicated file creation function with the folder's ID
+        if (typeof onCreateFile === 'function') {
+          await onCreateFile({
+            name: fileName,
+            folder: folder.id,
+            is_main: isMainFile,
+            content: "" // Initial empty content
+          });
         }
       }
       

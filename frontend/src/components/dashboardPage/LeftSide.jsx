@@ -85,32 +85,67 @@ export default function LeftSide({ onFileSelect }) {
       // Update the projectFolders state
       setProjectFolders(folderMapping);
 
+      // We'll need to fetch files in folders
+      const projectsWithNestedFiles = await Promise.all(list.map(async (project) => {
+        // For each folder, fetch files inside it
+        const foldersWithFiles = await Promise.all((project.folders || []).map(async (folder) => {
+          try {
+            // Fetch files for this folder
+            const folderFilesResp = await authAxios.get(`/api/files/files/?folder=${folder.id}`);
+            const folderFiles = Array.isArray(folderFilesResp.data) 
+              ? folderFilesResp.data 
+              : folderFilesResp.data.results || [];
+            
+            // Return the folder with its files added to items
+            return {
+              ...folder,
+              items: folderFiles.map(file => ({
+                id: file.id,
+                title: file.name,
+                type: "file"
+              }))
+            };
+          } catch (error) {
+            console.error(`Error fetching files for folder ${folder.id}:`, error);
+            return { ...folder, items: [] };
+          }
+        }));
+        
+        // Return the project with updated folders
+        return {
+          ...project,
+          folders: foldersWithFiles
+        };
+      }));
+
       setSections((secs) =>
         secs.map((sec) => {
           if (sec.id === "projects") {
             return {
               ...sec,
-              items: list.map((p) => {
+              items: projectsWithNestedFiles.map((p) => {
                 return {
                   id: p.id,
                   title: p.name,
                   expanded: false,
                   items: [
-                    // Include all folders from the API response
+                    // Include all folders with their files
                     ...(p.folders || []).map(folder => ({
                       id: folder.id,
                       title: folder.name,
                       type: "folder",
                       expanded: false,
-                      items: [] // Empty folder items array - could contain files if API provides that relationship
+                      items: folder.items || [] // Now includes files inside the folder
                     })),
                     
-                    // Include all files
-                    ...(p.files || []).map(f => ({
-                      id: f.id,
-                      title: f.name,
-                      type: "file"
-                    }))
+                    // Include root files (those without a folder)
+                    ...(p.files || [])
+                      .filter(f => !f.folder) // Only include files without a folder
+                      .map(f => ({
+                        id: f.id,
+                        title: f.name,
+                        type: "file"
+                      }))
                   ]
                 };
               }),
@@ -125,8 +160,6 @@ export default function LeftSide({ onFileSelect }) {
           }
         })
       );
-      
-      // No need to call fetchFolders separately
     } catch (e) {
       console.error(e);
       setError(e.response?.data?.detail || e.message);
@@ -208,20 +241,28 @@ export default function LeftSide({ onFileSelect }) {
     }
   };
   
-  // Add this new function to handle moving files between folders
+  // Update the moveFile function to make it more robust
   const moveFile = async (fileId, targetFolderId, sourceProjectId, targetProjectId) => {
     try {
+      console.log(`Moving file ${fileId} to folder ${targetFolderId}`);
+      
+      // Convert the IDs to numbers if they're strings
+      const numFileId = parseInt(fileId, 10) || fileId;
+      const numTargetFolderId = parseInt(targetFolderId, 10) || targetFolderId;
+      
       // Make an API call to update the file's folder
-      const response = await authAxios.patch(`/api/files/files/${fileId}/`, {
-        folder: targetFolderId
+      const response = await authAxios.patch(`/api/files/files/${numFileId}/`, {
+        folder: numTargetFolderId || null // Use null to move to project root
       });
+      
+      console.log(`✅ File moved successfully:`, response.data);
       
       // Refresh projects to update the UI
       await fetchProjects();
       
       return response.data;
     } catch (error) {
-      console.error('Error moving file:', error);
+      console.error('❌ Error moving file:', error);
       throw new Error(
         error.response?.data?.detail || 
         error.message || 
@@ -512,17 +553,23 @@ export default function LeftSide({ onFileSelect }) {
         onClose={() => setProjectModalOpen(false)}
         onSubmit={createProject}
       />
-      
+
       <FolderModal 
         isOpen={folderModalOpen}
         onClose={() => setFolderModalOpen(false)}
-        onSubmit={{
-          ...createFolder,
-          createFile: createFile
-        }}
+        onSubmit={createFolder}
         projectId={activeProjectId}
+        onCreateFile={(fileData) => {
+          // This ensures we use the folder's ID when creating a file
+          return createFile(
+            activeProjectId, 
+            fileData.name,
+            fileData.is_main, 
+            fileData.folder
+          );
+        }}
       />
-      
+
       <FileModal 
         isOpen={fileModalOpen}
         onClose={() => setFileModalOpen(false)}

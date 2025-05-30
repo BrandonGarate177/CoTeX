@@ -4,9 +4,7 @@ import {
   FiFolder, 
   FiFile, 
   FiPlus, 
-  FiEdit, 
-  FiTrash2,
-  FiMoreHorizontal
+  FiMoreHorizontal 
 } from 'react-icons/fi';
 
 const ProjectItem = ({ 
@@ -18,239 +16,199 @@ const ProjectItem = ({
   onAddFolder,
   onMoveFile
 }) => {
+  const [draggingFileId, setDraggingFileId] = useState(null);
+  const [hoveredFolderId, setHoveredFolderId] = useState(null);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
-  const [activeContextMenu, setActiveContextMenu] = useState(null);
-
-  // Method to find a folder by ID, including in nested folders
-  const findFolder = (folderId, items = project.items) => {
-    for (const item of items) {
-      if (item.type === 'folder' && item.id === folderId) {
-        return item;
-      }
-      if (item.type === 'folder' && item.items) {
-        const found = findFolder(folderId, item.items);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-
-  // Helper to render nested folders recursively
-  const renderFolderContents = (folder) => {
-    if (!folder.items) return null;
-    
-    return (
-      <div className={`ml-4 ${folder.expanded ? 'block' : 'hidden'}`}>
-        {folder.items.map(item => {
-          if (item.type === 'folder') {
-            return renderFolder(item);
-          } else {
-            return renderFile(item, folder.id);
-          }
-        })}
-      </div>
-    );
-  };
-
-  const handleDragStart = (e, fileId, fileName) => {
-    e.dataTransfer.setData('fileId', fileId);
-    e.dataTransfer.setData('fileName', fileName);
-    e.dataTransfer.setData('projectId', project.id);
+  
+  // Handler for starting file drag
+  const handleFileDragStart = (e, fileId) => {
+    e.stopPropagation();
+    setDraggingFileId(fileId);
+    e.dataTransfer.setData('text/plain', fileId);
     e.dataTransfer.effectAllowed = 'move';
   };
-  
-  const handleFolderDragOver = (e) => {
+
+  // Handler for dragging over a folder
+  const handleFolderDragOver = (e, folderId) => {
     e.preventDefault();
+    e.stopPropagation();
+    setHoveredFolderId(folderId);
     e.dataTransfer.dropEffect = 'move';
   };
-  
-  const handleFolderDrop = (e, folderId) => {
+
+  // Handler for dropping a file into a folder
+  const handleFolderDrop = async (e, folderId) => {
     e.preventDefault();
+    e.stopPropagation();
+    setHoveredFolderId(null);
     
-    const fileId = e.dataTransfer.getData('fileId');
-    const fileName = e.dataTransfer.getData('fileName');
-    const sourceProjectId = e.dataTransfer.getData('projectId');
+    const fileId = e.dataTransfer.getData('text/plain');
     
-    // Call parent component's method to handle the move
-    if (onMoveFile && fileId) {
-      onMoveFile(fileId, folderId, sourceProjectId, project.id);
+    if (fileId && onMoveFile) {
+      try {
+        await onMoveFile(fileId, folderId, project.id, project.id);
+        console.log(`✅ Moved file ${fileId} to folder ${folderId}`);
+      } catch (error) {
+        console.error('❌ Error moving file:', error);
+      }
     }
   };
 
-  // Render a folder item with drag-and-drop capability
-  const renderFolder = (folder) => {
-    return (
-      <div key={folder.id} className="relative">
-        <div 
-          className="flex items-center px-4 py-1.5 hover:bg-[#37155F] cursor-pointer group"
-          onDragOver={handleFolderDragOver}
-          onDrop={(e) => handleFolderDrop(e, folder.id)}
+  // Handler for dragging leave
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setHoveredFolderId(null);
+  };
+
+  // Stop propagation for all drag events on project item
+  const handleProjectDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // Render project files (files in root directory)
+  const renderRootFiles = () => {
+    return project.items
+      .filter(item => item.type === 'file')
+      .map(file => (
+        <div
+          key={file.id}
+          className="flex items-center pl-8 py-1 hover:bg-[#37155F] cursor-pointer group"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFileClick(file.id);
+          }}
+          draggable
+          onDragStart={(e) => handleFileDragStart(e, file.id)}
+          onDragEnd={(e) => e.stopPropagation()}
         >
-          <button
-            onClick={() => onToggleFolder(folder.id)}
-            className="flex items-center flex-1 outline-none"
+          <FiFile className="mr-2 text-gray-400" size={14} />
+          <span className="text-sm">{file.title}</span>
+        </div>
+      ));
+  };
+
+  // Render project folders with their nested files
+  const renderFolders = () => {
+    return project.items
+      .filter(item => item.type === 'folder')
+      .map(folder => (
+        <div key={folder.id} onDragOver={handleProjectDragOver}>
+          <div 
+            className={`flex items-center pl-7 py-1 cursor-pointer group ${
+              hoveredFolderId === folder.id ? 'bg-[#37155F]/70' : 'hover:bg-[#37155F]'
+            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFolder(folder.id);
+            }}
+            onDragOver={(e) => handleFolderDragOver(e, folder.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleFolderDrop(e, folder.id)}
           >
             <FiChevronRight
-              className={`transform transition-transform duration-200 mr-1 ${
+              className={`transform transition-transform duration-200 mr-1 text-gray-400 ${
                 folder.expanded ? 'rotate-90' : ''
               }`}
-              size={14}
-            />
-            <FiFolder className="mr-1.5 text-yellow-400" size={14} />
-            <span className="text-sm truncate">{folder.title}</span>
-          </button>
-          
-          {/* Context menu trigger */}
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              className="p-1 rounded hover:bg-[#4B2077]"
+              size={12}
               onClick={(e) => {
                 e.stopPropagation();
-                setActiveContextMenu(activeContextMenu === folder.id ? null : folder.id);
+                onToggleFolder(folder.id);
               }}
-            >
-              <FiMoreHorizontal size={14} />
-            </button>
+            />
+            <FiFolder className="mr-2 text-blue-400" size={14} />
+            <span className="text-sm">{folder.title}</span>
             
-            {/* Context menu */}
-            {activeContextMenu === folder.id && (
-              <div className="absolute right-0 mt-1 py-1 bg-[#27004A] rounded shadow-lg z-10 border border-[#37155F] w-44">
-                <button
-                  className="w-full text-left px-3 py-1.5 hover:bg-[#37155F] flex items-center"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddFile(project.id, folder.id);
-                    setActiveContextMenu(null);
-                  }}
-                >
-                  <FiFile className="mr-2" size={14} />
-                  <span>New File</span>
-                </button>
-                <button
-                  className="w-full text-left px-3 py-1.5 hover:bg-[#37155F] flex items-center"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // This would require implementing nested folder creation
-                    onAddFolder(project.id, folder.id); 
-                    setActiveContextMenu(null);
-                  }}
-                >
-                  <FiFolder className="mr-2" size={14} />
-                  <span>New Subfolder</span>
-                </button>
-                <div className="border-t border-[#37155F] my-1"></div>
-                <button
-                  className="w-full text-left px-3 py-1.5 hover:bg-[#37155F] text-red-400 flex items-center"
-                >
-                  <FiTrash2 className="mr-2" size={14} />
-                  <span>Delete</span>
-                </button>
-              </div>
+            {/* Visual indicator when dragging over */}
+            {hoveredFolderId === folder.id && (
+              <div className="ml-2 text-xs text-purple-400">Drop here</div>
             )}
           </div>
-        </div>
-        
-        {/* Render nested content if expanded */}
-        {renderFolderContents(folder)}
-      </div>
-    );
-  };
-
-  // Render a file with drag capability
-  const renderFile = (file, parentFolderId = null) => {
-    return (
-      <div
-        key={file.id}
-        className="flex items-center px-8 py-1.5 hover:bg-[#37155F] cursor-pointer group"
-        onClick={() => onFileClick(file.id)}
-        draggable
-        onDragStart={(e) => handleDragStart(e, file.id, file.title)}
-      >
-        <div className="flex items-center flex-1">
-          <FiFile className="mr-1.5 text-blue-400" size={14} />
-          <span className="text-sm truncate">{file.title}</span>
-        </div>
-        
-        {/* File context menu could be added here */}
-      </div>
-    );
-  };
-
-  return (
-    <div className="mb-1">
-      {/* Project header */}
-      <div className="relative">
-        <div
-          className="flex items-center px-4 py-1.5 hover:bg-[#37155F] cursor-pointer group"
-          onClick={() => onToggleProject(project.id)}
-        >
-          <FiChevronRight
-            className={`transform transition-transform duration-200 mr-1 ${
-              project.expanded ? 'rotate-90' : ''
-            }`}
-            size={14}
-          />
-          <span className="text-sm font-medium truncate flex-1">{project.title}</span>
           
-          {/* Project actions */}
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex">
-            <button
-              className="p-1 rounded hover:bg-[#4B2077] mr-1"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddFile(project.id);
-              }}
-              title="New File"
-            >
-              <FiFile size={14} />
-            </button>
-            <button
-              className="p-1 rounded hover:bg-[#4B2077]"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddFolder(project.id);
-              }}
-              title="New Folder"
-            >
-              <FiFolder size={14} />
-            </button>
-            <button
-              className="p-1 rounded hover:bg-[#4B2077] ml-1"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowProjectMenu(!showProjectMenu);
-              }}
-            >
-              <FiMoreHorizontal size={14} />
-            </button>
-          </div>
+          {/* Render files inside a folder */}
+          {folder.expanded && folder.items && folder.items.length > 0 && (
+            <div>
+              {folder.items.map(file => (
+                <div
+                  key={file.id}
+                  className="flex items-center pl-12 py-1 hover:bg-[#37155F] cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onFileClick(file.id);
+                  }}
+                  draggable
+                  onDragStart={(e) => handleFileDragStart(e, file.id)}
+                  onDragEnd={(e) => e.stopPropagation()}
+                >
+                  <FiFile className="mr-2 text-gray-400" size={14} />
+                  <span className="text-sm">{file.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
           
-          {/* Project context menu */}
-          {showProjectMenu && (
-            <div className="absolute right-0 mt-1 py-1 bg-[#27004A] rounded shadow-lg z-10 border border-[#37155F] w-44 top-full">
-              <button className="w-full text-left px-3 py-1.5 hover:bg-[#37155F] flex items-center">
-                <FiEdit className="mr-2" size={14} />
-                <span>Rename</span>
-              </button>
-              <button className="w-full text-left px-3 py-1.5 hover:bg-[#37155F] text-red-400 flex items-center">
-                <FiTrash2 className="mr-2" size={14} />
-                <span>Delete</span>
-              </button>
+          {/* Empty folder message */}
+          {folder.expanded && (!folder.items || folder.items.length === 0) && (
+            <div className="pl-12 py-1 text-xs text-gray-500 italic">
+              Empty folder
             </div>
           )}
         </div>
+      ));
+  };
+
+  return (
+    <div className="py-1" onDragOver={handleProjectDragOver}>
+      {/* Project item with toggle */}
+      <div 
+        className="flex items-center pl-4 py-1 hover:bg-[#37155F] cursor-pointer group"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleProject(project.id);
+        }}
+      >
+        <FiChevronRight
+          className={`transform transition-transform duration-200 mr-1 text-gray-400 ${
+            project.expanded ? 'rotate-90' : ''
+          }`}
+          size={14}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleProject(project.id);
+          }}
+        />
+        <span className="text-sm font-medium">{project.title}</span>
+
+        <div className="ml-auto mr-2 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            className="p-1 rounded hover:bg-[#4B2077] text-gray-400 hover:text-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddFile(project.id);
+            }}
+            title="Add File"
+          >
+            <FiFile size={12} />
+          </button>
+          <button
+            className="p-1 rounded hover:bg-[#4B2077] text-gray-400 hover:text-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddFolder(project.id);
+            }}
+            title="Add Folder"
+          >
+            <FiFolder size={12} />
+          </button>
+        </div>
       </div>
-      
-      {/* Project contents */}
+
+      {/* Expanded project contents */}
       {project.expanded && (
-        <div className="ml-4">
-          {project.items.map(item => {
-            if (item.type === 'folder') {
-              return renderFolder(item);
-            } else {
-              return renderFile(item);
-            }
-          })}
+        <div>
+          {renderFolders()}
+          {renderRootFiles()}
         </div>
       )}
     </div>
