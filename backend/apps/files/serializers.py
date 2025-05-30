@@ -3,9 +3,19 @@ from .models import File, Folder, GitFile
 
 
 class FileSerializer(serializers.ModelSerializer):
+    folder = serializers.SerializerMethodField()
+
+    def get_folder(self, obj): 
+        if obj.folder: 
+            return {
+                'id': obj.folder.id,
+                'name': obj.folder.name
+            }
+        return None
+
     class Meta:
         model = File
-        fields = ['id', 'name', 'content', 'is_main', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'content', 'is_main', 'created_at', 'updated_at', 'folder']
 
 
 class GitFileSerializer(serializers.ModelSerializer):

@@ -1,0 +1,54 @@
+# May 30th, Endpoints path when booting up 
+
+### 1. JUST booting the app up
+[30/May/2025 19:02:47] "GET /api/csrf/ HTTP/1.1" 200 105
+
+### 2. Logging in: (Throws a whole shit ton of calls): 
+[30/May/2025 19:03:07] "POST /api/auth/login/ HTTP/1.1" 200 695
+[30/May/2025 19:03:07] "GET /api/csrf/ HTTP/1.1" 200 105
+[30/May/2025 19:03:07] "GET /api/csrf/ HTTP/1.1" 200 105
+[30/May/2025 19:03:07] "GET /api/projects/ HTTP/1.1" 200 4011
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=4 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=3 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=5 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=2 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/projects/ HTTP/1.1" 200 4011
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=2 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/projects/ HTTP/1.1" 200 4011
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=3 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=5 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=4 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=2 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=5 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=4 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=3 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/projects/ HTTP/1.1" 200 4011
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=5 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=3 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=2 HTTP/1.1" 200 2
+[30/May/2025 19:03:07] "GET /api/files/files/?folder=4 HTTP/1.1" 200 2
+
+
+### 3. Opening Folder
+    - Since I guess that over the boot sequence all of the requests are made. 
+    - The names and location of all of the folders and files within the projects
+        are already booted. 
+
+### 4. Opening a couple files: 
+    Notice how the same file has two endpoints it likes to use. 
+    It uses the GET method to render the content very quickly in the screen
+    THEN it uses the PATCH method in order to updates the contents of the file 
+
+[30/May/2025 19:05:43] "GET /api/files/files/16/ HTTP/1.1" 200 293
+[30/May/2025 19:05:45] "PATCH /api/files/files/16/ HTTP/1.1" 200 293
+[30/May/2025 19:05:46] "GET /api/files/files/15/ HTTP/1.1" 200 273
+[30/May/2025 19:05:47] "PATCH /api/files/files/15/ HTTP/1.1" 200 273
+[30/May/2025 19:05:47] "GET /api/files/files/12/ HTTP/1.1" 200 1079
+[30/May/2025 19:05:48] "PATCH /api/files/files/12/ HTTP/1.1" 200 1079
+
+### 5. Editing a file: 
+
+    The behavior here is that everytime that I click on a part of the editor,
+    The PATCH method is called. Clearly that is going to be an issue if we are
+    going into production 
+    

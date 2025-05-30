@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { authAxios } from '../../utils/auth';
 import { 
   FiFolder, 
@@ -37,6 +37,21 @@ const initialSections = [
   },
 ];
 
+// Utility function for debouncing
+const useDebounce = (callback, delay) => {
+  const timeoutRef = useRef(null);
+  
+  return useCallback((...args) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    timeoutRef.current = setTimeout(() => {
+      callback(...args);
+    }, delay);
+  }, [callback, delay]);
+};
+
 export default function LeftSide({ onFileSelect }) {
   // State variables
   const [folderModalOpen, setFolderModalOpen] = useState(false);
@@ -54,6 +69,9 @@ export default function LeftSide({ onFileSelect }) {
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [hoveredSection, setHoveredSection] = useState(null);
+  
+  // Keep track of request cancellation
+  const abortControllerRef = useRef(null);
 
   // Mock updates for demonstration
   const mockUpdates = [
@@ -62,115 +80,215 @@ export default function LeftSide({ onFileSelect }) {
     { id: 3, type: 'version', text: 'v1.2.0 released', date: '3 days ago' },
   ];
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (specificProjectId = null) => {
+    // Cancel any in-flight requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
+    
     setLoading(true);
     setError(null);
+    
     try {
-      // With the modified API, we only need one call
-      const resp = await authAxios.get("/api/projects/");
+      // If specific project ID is provided, only fetch that one project
+      // Otherwise fetch all projects
+      const endpoint = specificProjectId 
+        ? `/api/projects/${specificProjectId}/` 
+        : "/api/projects/";
       
-      // Either data.results (paginated) or data (unpaginated)
-      const list = Array.isArray(resp.data)
-        ? resp.data
-        : resp.data.results;
-
-      // Build the project folders mapping
-      const folderMapping = {};
-      list.forEach(project => {
+      const resp = await authAxios.get(endpoint, { signal });
+      
+      let projectsList;
+      if (specificProjectId) {
+        // For a single project, wrap it in an array
+        projectsList = [resp.data];
+      } else {
+        // For multiple projects, extract the list
+        projectsList = Array.isArray(resp.data)
+          ? resp.data
+          : resp.data.results;
+      }
+      
+      // Build the project folders mapping for dropdown usage
+      const folderMapping = { ...projectFolders };
+      projectsList.forEach(project => {
         if (project.folders && project.folders.length > 0) {
           folderMapping[project.id] = project.folders;
         }
       });
       
-      // Update the projectFolders state
       setProjectFolders(folderMapping);
 
-      // We'll need to fetch files in folders
-      const projectsWithNestedFiles = await Promise.all(list.map(async (project) => {
-        // For each folder, fetch files inside it
-        const foldersWithFiles = await Promise.all((project.folders || []).map(async (folder) => {
-          try {
-            // Fetch files for this folder
-            const folderFilesResp = await authAxios.get(`/api/files/files/?folder=${folder.id}`);
-            const folderFiles = Array.isArray(folderFilesResp.data) 
-              ? folderFilesResp.data 
-              : folderFilesResp.data.results || [];
-            
-            // Return the folder with its files added to items
-            return {
-              ...folder,
-              items: folderFiles.map(file => ({
-                id: file.id,
-                title: file.name,
-                type: "file"
-              }))
-            };
-          } catch (error) {
-            console.error(`Error fetching files for folder ${folder.id}:`, error);
-            return { ...folder, items: [] };
+      // For each project, get ALL files
+      const projectsWithAllFiles = await Promise.all(projectsList.map(async (project) => {
+        // Get all files for this project
+        const allFilesResp = await authAxios.get(`/api/files/files/?project=${project.id}`, { signal });
+        const allFiles = Array.isArray(allFilesResp.data) 
+          ? allFilesResp.data 
+          : allFilesResp.data.results || [];
+
+        // Organize files by folder
+        const rootFiles = [];
+        const filesByFolder = {};
+
+        // Group files by their folder ID
+        allFiles.forEach(file => {
+          if (file.folder) {
+            // This file belongs in a folder
+            if (!filesByFolder[file.folder]) {
+              filesByFolder[file.folder] = [];
+            }
+            filesByFolder[file.folder].push(file);
+          } else {
+            // This is a root file
+            rootFiles.push(file);
           }
-        }));
+        });
+
+        // Process folders to include their files
+        const foldersWithFiles = (project.folders || []).map(folder => {
+          const folderFiles = filesByFolder[folder.id] || [];
+          return {
+            ...folder,
+            items: folderFiles.map(file => ({
+              id: file.id,
+              title: file.name,
+              type: "file"
+            }))
+          };
+        });
         
-        // Return the project with updated folders
         return {
           ...project,
+          rootFiles,
           folders: foldersWithFiles
         };
       }));
 
-      setSections((secs) =>
-        secs.map((sec) => {
+      // Now update the sections state with the complete project data
+      setSections((secs) => {
+        return secs.map((sec) => {
           if (sec.id === "projects") {
-            return {
-              ...sec,
-              items: projectsWithNestedFiles.map((p) => {
-                return {
-                  id: p.id,
-                  title: p.name,
-                  expanded: false,
-                  items: [
-                    // Include all folders with their files
-                    ...(p.folders || []).map(folder => ({
-                      id: folder.id,
-                      title: folder.name,
-                      type: "folder",
-                      expanded: false,
-                      items: folder.items || [] // Now includes files inside the folder
-                    })),
+            if (specificProjectId) {
+              // If we fetched just one project, update only that project
+              const updatedProject = projectsWithAllFiles[0];
+              return {
+                ...sec,
+                items: sec.items.map(existingProject => {
+                  if (existingProject.id === specificProjectId) {
+                    // Keep the expanded state of the project
+                    const wasExpanded = existingProject.expanded;
                     
-                    // Include root files (those without a folder)
-                    ...(p.files || [])
-                      .filter(f => !f.folder) // Only include files without a folder
-                      .map(f => ({
+                    return {
+                      ...updatedProject,
+                      title: updatedProject.name,
+                      expanded: wasExpanded,
+                      items: [
+                        // Include all folders with their files
+                        ...(updatedProject.folders || []).map(folder => ({
+                          id: folder.id,
+                          title: folder.name,
+                          type: "folder",
+                          // Try to preserve expanded state of folders if possible
+                          expanded: existingProject.items?.find(i => i.id === folder.id)?.expanded || false,
+                          items: folder.items || []
+                        })),
+                        
+                        // Include root files (those without a folder)
+                        ...(updatedProject.rootFiles || []).map(f => ({
+                          id: f.id,
+                          title: f.name,
+                          type: "file"
+                        }))
+                      ]
+                    };
+                  }
+                  return existingProject;
+                })
+              };
+            } else {
+              // Full refresh of all projects
+              return {
+                ...sec,
+                items: projectsWithAllFiles.map((p) => {
+                  // Try to preserve expanded state
+                  const existingProject = sec.items.find(ep => ep.id === p.id);
+                  const wasExpanded = existingProject?.expanded || false;
+                  
+                  return {
+                    id: p.id,
+                    title: p.name,
+                    expanded: wasExpanded,
+                    items: [
+                      // Include all folders with their files
+                      ...(p.folders || []).map(folder => {
+                        // Try to preserve expanded state of folders
+                        const existingFolder = existingProject?.items?.find(i => i.id === folder.id && i.type === 'folder');
+                        const folderWasExpanded = existingFolder?.expanded || false;
+                        
+                        return {
+                          id: folder.id,
+                          title: folder.name,
+                          type: "folder",
+                          expanded: folderWasExpanded,
+                          items: folder.items || []
+                        };
+                      }),
+                      
+                      // Include root files (those without a folder)
+                      ...(p.rootFiles || []).map(f => ({
                         id: f.id,
                         title: f.name,
                         type: "file"
                       }))
-                  ]
-                };
-              }),
-            };
+                    ]
+                  };
+                }),
+              };
+            }
           } else if (sec.id === "updates") {
+            // Updates aren't affected by project changes
             return {
               ...sec,
-              items: mockUpdates
+              items: sec.items.length > 0 ? sec.items : mockUpdates
             };
           } else {
             return sec;
           }
-        })
-      );
+        });
+      });
     } catch (e) {
-      console.error(e);
-      setError(e.response?.data?.detail || e.message);
+      // Only show error if it's not an abort error
+      if (e.name !== 'AbortError') {
+        console.error(e);
+        setError(e.response?.data?.detail || e.message);
+      }
     } finally {
-      setLoading(false);
+      if (signal.aborted === false) {
+        setLoading(false);
+      }
     }
   };
+
+  // Create a debounced refresh function for specific projects
+  const debouncedRefreshProject = useDebounce((projectId) => {
+    fetchProjects(projectId);
+  }, 1000); // Debounce by 1 second
 
   // fetch immediately when the component loads
   useEffect(() => {
     fetchProjects();
+    
+    // Cleanup function to abort any in-flight requests when component unmounts
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, []);
 
   // kick off your first load when you expand "Projects"
@@ -196,7 +314,8 @@ export default function LeftSide({ onFileSelect }) {
       
       const response = await authAxios.post('/api/files/folders/', folderData);
       
-      await fetchProjects();
+      // Only refresh the specific project
+      debouncedRefreshProject(projectId);
       
       return response.data;
     } catch (error) {
@@ -226,7 +345,8 @@ export default function LeftSide({ onFileSelect }) {
     try {
       const response = await authAxios.post('/api/files/files/', fileData);
       
-      await fetchProjects();
+      // Only refresh the specific project
+      debouncedRefreshProject(projectId);
       
       return response.data;
     } catch (error) {
@@ -241,28 +361,153 @@ export default function LeftSide({ onFileSelect }) {
     }
   };
   
-  // Update the moveFile function to make it more robust
+  // Update the moveFile function
   const moveFile = async (fileId, targetFolderId, sourceProjectId, targetProjectId) => {
     try {
-      console.log(`Moving file ${fileId} to folder ${targetFolderId}`);
+      console.log("🔄 moveFile called with:", {
+        fileId,
+        targetFolderId,
+        sourceProjectId,
+        targetProjectId
+      });
       
       // Convert the IDs to numbers if they're strings
       const numFileId = parseInt(fileId, 10) || fileId;
       const numTargetFolderId = parseInt(targetFolderId, 10) || targetFolderId;
       
-      // Make an API call to update the file's folder
+      // Find the file we're moving to use in optimistic updates
+      let fileToMove = null;
+      let fileName = null;
+      
+      // First search in the source project
+      const sourceProject = sections.find(s => s.id === 'projects')
+        ?.items.find(p => p.id === sourceProjectId);
+      
+      if (sourceProject) {
+        // Check root files
+        const rootFile = sourceProject.items.find(i => i.type === 'file' && i.id === numFileId);
+        if (rootFile) {
+          fileToMove = rootFile;
+          fileName = rootFile.title;
+        } else {
+          // Check in folders
+          for (const folder of sourceProject.items.filter(i => i.type === 'folder')) {
+            const folderFile = folder.items?.find(i => i.id === numFileId);
+            if (folderFile) {
+              fileToMove = folderFile;
+              fileName = folderFile.title;
+              break;
+            }
+          }
+        }
+      }
+      
+      // Apply optimistic UI update first
+      setSections((prevSections) => {
+        return prevSections.map(section => {
+          if (section.id === 'projects') {
+            return {
+              ...section,
+              items: section.items.map(project => {
+                if (project.id === sourceProjectId) {
+                  // Find the file to move
+                  let fileToMove = null;
+                  let fileType = null;
+                  
+                  // First check root files
+                  const newRootItems = project.items.filter(item => {
+                    if (item.type === 'file' && item.id === numFileId) {
+                      fileToMove = { ...item };
+                      fileType = 'root';
+                      return false;
+                    }
+                    return true;
+                  });
+                  
+                  // If not found in root, check folders
+                  const newItems = newRootItems.map(item => {
+                    if (item.type === 'folder') {
+                      // If this is the target folder, add the file here
+                      if (item.id === numTargetFolderId && fileToMove) {
+                        return {
+                          ...item,
+                          items: [...(item.items || []), fileToMove]
+                        };
+                      } 
+                      // If not the target, check if file is in this folder
+                      else if (item.items && item.items.length > 0) {
+                        const newFolderItems = item.items.filter(folderItem => {
+                          if (folderItem.id === numFileId) {
+                            fileToMove = { ...folderItem };
+                            fileType = 'folder';
+                            return false;
+                          }
+                          return true;
+                        });
+                        
+                        return {
+                          ...item,
+                          items: newFolderItems
+                        };
+                      }
+                    }
+                    return item;
+                  });
+                  
+                  // If file was found in a folder and target is root (null)
+                  if (fileType === 'folder' && numTargetFolderId === null && fileToMove) {
+                    return {
+                      ...project,
+                      items: [...newItems, fileToMove]
+                    };
+                  }
+                  
+                  return {
+                    ...project,
+                    items: newItems
+                  };
+                }
+                return project;
+              })
+            };
+          }
+          return section;
+        });
+      });
+      
+      // Make the API call
       const response = await authAxios.patch(`/api/files/files/${numFileId}/`, {
-        folder: numTargetFolderId || null // Use null to move to project root
+        folder: numTargetFolderId || null
       });
       
       console.log(`✅ File moved successfully:`, response.data);
       
-      // Refresh projects to update the UI
-      await fetchProjects();
+      // Important: cancel any pending refreshes that might overwrite our optimistic update
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Only refresh if something unexpected happened in the server response
+      const serverFolder = response.data.folder;
+      const serverName = response.data.name;
+      
+      if ((serverFolder !== numTargetFolderId) || (serverName !== fileName)) {
+        console.log("⚠️ Server returned unexpected data, refreshing...");
+        // Only in this case do we refresh to get the correct state
+        debouncedRefreshProject(sourceProjectId);
+        
+        if (targetProjectId && targetProjectId !== sourceProjectId) {
+          debouncedRefreshProject(targetProjectId);
+        }
+      }
       
       return response.data;
     } catch (error) {
       console.error('❌ Error moving file:', error);
+      
+      // If there was an error, refresh to restore the previous state
+      debouncedRefreshProject(sourceProjectId);
+      
       throw new Error(
         error.response?.data?.detail || 
         error.message || 
@@ -304,7 +549,7 @@ export default function LeftSide({ onFileSelect }) {
         if (i === idx) {
           const expanded = !sec.expanded;
           // if this is the projects section and we're now opening it…
-          if (sec.id === 'projects' && expanded) {
+          if (sec.id === 'projects' && expanded && sec.items.length === 0) {
             fetchProjects();
           }
           return { ...sec, expanded };
@@ -373,7 +618,8 @@ export default function LeftSide({ onFileSelect }) {
       name: projectName
     });
     
-    await fetchProjects();
+    // Refresh all projects when creating a new one
+    fetchProjects();
     
     return response.data;
   };
@@ -389,6 +635,7 @@ export default function LeftSide({ onFileSelect }) {
     setFolderModalOpen(true);
   };
 
+  // Global refresh now includes abort controller for safety
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchProjects();
