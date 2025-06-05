@@ -35,8 +35,16 @@ class GitFileSerializer(serializers.ModelSerializer):
         ).count()
 
 
+class FileMinimalSerializer(serializers.ModelSerializer):
+    """A minimal serializer that excludes file content"""
+    class Meta:
+        model = File
+        fields = ['id', 'name', 'is_main', 'created_at', 'updated_at']
+
+
 class FolderSerializer(serializers.ModelSerializer):
-    files = FileSerializer(many=True, read_only=True)
+    files = FileMinimalSerializer(many=True, read_only=True)
+    
     class Meta:
         model = Folder
-        fields = ['id','name', 'parent', 'project', 'files','created_at', 'updated_at', 'file_count']
+        fields = ['id', 'name', 'parent', 'project', 'files', 'created_at', 'updated_at', 'file_count']

@@ -3,16 +3,28 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.http import HttpResponse
 from .models import Project
-from .serializers import ProjectSerializer
+from .serializers import ProjectSerializer, ProjectListSerializer, ProjectStructureSerializer
 from apps.files.models import File
 from apps.files.LaTeX import LatexCompiler
+from rest_framework.pagination import PageNumberPagination
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 class ProjectViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows projects to be viewed or edited.
     """
-    serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_serializer_class(self):
+        # Use lightweight serializer for list actions
+        if self.action == 'list':
+            return ProjectListSerializer
+        return ProjectSerializer
     
     def get_queryset(self):
         # Check if this is a schema generation request from Swagger
@@ -64,3 +76,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
         project.is_github_repo = not project.is_github_repo
         project.save()
         return Response({"is_github_repo": project.is_github_repo})
+    
+    @action(detail=True, methods=['get'])
+    def structure(self, request, pk=None):
+        """Get project structure with files and folders but without file content"""
+        project = self.get_object()
+        serializer = ProjectStructureSerializer(project)
+        return Response(serializer.data)

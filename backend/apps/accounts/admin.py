@@ -61,7 +61,7 @@ class ProfileAdmin(admin.ModelAdmin):
                 html += "<ul>"
                 for project in collab_projects:
                     url = reverse('admin:projects_project_change', args=[project.id])
-                    html += f'<li><a href="{url}">{project.title}</a></li>'
+                    html += f'<li><a href="{url}">{project.name}</a></li>'
                 html += "</ul>"
             else:
                 html += "<p>No collaborating projects</p>"
